@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>X自動ポスト</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#F5F6F8;--surface:#FFFFFF;--sunk:#F0F2F5;--ink:#1A1D21;--muted:#555B63;--line:#C9CED4;--hair:#E1E4E8;
+  --accent:#1F4FC4;--accent-ink:#FFFFFF;--accent-soft:#E6EDFB;--accent-soft-ink:#153A94;
+  --warn:#C25E00;--warn-soft:#FBE7D3;--warn-ink:#7A3A00;
+  --ok:#1E6B3A;--ok-soft:#DDEFE4;--danger:#A1281B;--danger-line:#E8B7B0;
+  --col-empty:#ECEEF1;--col-gen:#E3EAF8;--col-cand:#F7EEDC;--col-adopt:#DDEFE4;
+  --dark-btn:#1A1D21;--dark-btn-ink:#FFFFFF;
+  color-scheme:light;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15171A;--surface:#1F2226;--sunk:#272B30;--ink:#ECEDEF;--muted:#A9AEB5;--line:#4A4F56;--hair:#30343A;
+  --accent:#6E95F0;--accent-ink:#0B1530;--accent-soft:#22314F;--accent-soft-ink:#C9D7FA;
+  --warn:#F0A060;--warn-soft:#3D2A17;--warn-ink:#F7CFA8;
+  --ok:#6FCB93;--ok-soft:#1D3527;--danger:#F08A7E;--danger-line:#6B3530;
+  --col-empty:#23262A;--col-gen:#1D2636;--col-cand:#2E2818;--col-adopt:#1C2E23;
+  --dark-btn:#ECEDEF;--dark-btn-ink:#15171A;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#15171A;--surface:#1F2226;--sunk:#272B30;--ink:#ECEDEF;--muted:#A9AEB5;--line:#4A4F56;--hair:#30343A;
+  --accent:#6E95F0;--accent-ink:#0B1530;--accent-soft:#22314F;--accent-soft-ink:#C9D7FA;
+  --warn:#F0A060;--warn-soft:#3D2A17;--warn-ink:#F7CFA8;
+  --ok:#6FCB93;--ok-soft:#1D3527;--danger:#F08A7E;--danger-line:#6B3530;
+  --col-empty:#23262A;--col-gen:#1D2636;--col-cand:#2E2818;--col-adopt:#1C2E23;
+  --dark-btn:#ECEDEF;--dark-btn-ink:#15171A;color-scheme:dark;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans JP",system-ui,sans-serif;font-size:14px;line-height:1.6}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--hair)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.brand{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+h1{font-size:18px;margin:0}
+nav{display:flex;gap:4px}
+nav a{padding:9px 14px;border-radius:8px;text-decoration:none;color:var(--muted)}
+nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-soft-ink);font-weight:700}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{min-height:34px;padding:0 10px;font-size:12px;border-radius:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.dark{background:var(--dark-btn);border-color:var(--dark-btn);color:var(--dark-btn-ink);font-weight:700}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:var(--surface);font-weight:700}
+.btn.warn{background:var(--warn);border-color:var(--warn);color:var(--surface);font-weight:700}
+.btn.danger{color:var(--danger);border-color:var(--danger-line)}
+select,input[type=text],input[type=url],input[type=password],input[type=search],input[type=number],input[type=datetime-local]{min-height:40px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);resize:vertical;line-height:1.75}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+main{padding:20px 24px 48px}
+.muted{color:var(--muted)}.small{font-size:12px}
+.banner{max-width:720px;margin:24px auto;padding:20px;background:var(--surface);border:1px solid var(--hair);border-radius:12px}
+.board-wrap{overflow-x:auto}
+.board{display:grid;grid-template-columns:repeat(4,minmax(250px,1fr));gap:14px;min-width:1040px}
+.col{border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:200px}
+.col[data-k="空"]{background:var(--col-empty)}.col[data-k="生成済"]{background:var(--col-gen)}.col[data-k="候補"]{background:var(--col-cand)}.col[data-k="採用"]{background:var(--col-adopt)}
+.col-h{display:flex;justify-content:space-between;align-items:baseline;padding:2px 4px}
+.col-h h2{font-size:14px;margin:0}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.card.is-regen{border:2px solid var(--warn)}
+.card .ttl{font-weight:500;word-break:break-word}
+.card .pv{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.card .acts{display:flex;flex-wrap:wrap;gap:6px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.badge.regen{background:var(--warn-soft);color:var(--warn-ink)}
+.badge.ok{background:var(--ok);color:var(--surface)}
+.badge.st{background:var(--sunk);color:var(--ink)}
+.empty{font-size:12px;color:var(--muted);padding:8px 4px}
+.layout{display:flex;flex-wrap:wrap;gap:20px;max-width:1400px;margin:0 auto}
+.layout>.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.layout>.side{flex:1 1 320px;max-width:440px;display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.panel h2{font-size:15px;margin:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grow{flex:1 1 auto}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{min-height:38px;padding:0 14px;border-radius:19px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.tab[aria-pressed="true"]{background:var(--dark-btn);border-color:var(--dark-btn);color:var(--dark-btn-ink)}
+.cnt{font-size:12px}.cnt.good{color:var(--ok)}.cnt.near{color:var(--muted)}.cnt.over{color:var(--danger);font-weight:700}
+.src{background:var(--sunk);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word}
+.thread{display:flex;flex-direction:column;gap:14px}
+.tw{display:flex;gap:10px}
+.av{width:36px;height:36px;border-radius:50%;background:var(--line);flex:0 0 auto}
+.tw p{margin:0;white-space:pre-wrap;word-break:break-word}
+pre.json{margin:0;padding:12px;border-radius:8px;background:#1A1D21;color:#E8EAED;font-size:12px;overflow-x:auto}
+.pat{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.pat .box{background:var(--sunk);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px}
+.pat .box p{margin:0;white-space:pre-wrap;font-size:13px}
+.acc-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.acc{border:1px solid var(--hair);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.chk{display:flex;gap:6px;align-items:center;font-size:13px;min-height:32px}
+dialog{border:none;border-radius:14px;padding:0;background:var(--surface);color:var(--ink);width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:20px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 40px);overflow:auto}
+.dlg h2{font-size:16px;margin:0}
+.src-list{display:flex;flex-direction:column;gap:8px}
+.src-item{border:1px solid var(--hair);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.src-item .ex{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+.checks{display:flex;flex-wrap:wrap;gap:8px 16px}
+.checks label{display:flex;gap:6px;align-items:center;min-height:32px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--dark-btn);color:var(--dark-btn-ink);padding:10px 16px;border-radius:10px;font-size:13px;z-index:50;max-width:calc(100vw - 32px)}
+#toast.err{background:var(--danger);color:var(--surface)}
+#busy{position:fixed;top:calc(env(safe-area-inset-top,0px) + 4px);right:12px;font-size:12px;z-index:20;background:var(--accent-soft);color:var(--accent-soft-ink);padding:4px 10px;border-radius:10px}
+[hidden]{display:none !important}
+@media (max-width:640px){header{padding:10px 14px}main{padding:14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>X自動ポスト</h1>
+    <nav aria-label="画面">
+      <a href="#board" data-nav="board">ボード</a>
+      <a href="#settings" data-nav="settings">設定</a>
+    </nav>
+  </div>
+  <div class="tools">
+    <label class="small muted" for="acc-filter">アカウント</label>
+    <select id="acc-filter"><option value="">すべて</option></select>
+    <button class="btn" id="btn-reload" type="button">再読み込み</button>
+    <button class="btn" id="btn-sync" type="button" title="抽出ポスト①の「アカウント」指定から、生成ポスト①に「空」を作ります">抽出ポスト①から取り込む</button>
+    <button class="btn primary" id="btn-add" type="button">＋ ネタを追加</button>
+  </div>
+</header>
+<div id="busy" hidden>通信中…</div>
+
+<main>
+  <!-- ボード -->
+  <section id="view-board" hidden>
+    <div class="board-wrap"><div class="board" id="board"></div></div>
+  </section>
+
+  <!-- 編集 -->
+  <section id="view-edit" hidden>
+    <div class="layout">
+      <div class="main">
+        <div class="panel">
+          <div class="row"><h2 id="ed-title" class="grow"></h2><span class="badge st" id="ed-status"></span><a id="ed-notion" target="_blank" rel="noopener" class="small">Notionで開く</a></div>
+          <div id="ed-empty" class="muted" hidden>まだ生成されていません。claude.ai側で生成すると、ここに3パターンが表示されます。</div>
+          <div id="ed-patterns" class="pat"></div>
+          <div class="tabs" id="ed-tabs" role="group" aria-label="編集のもとにするパターン"></div>
+          <div class="row"><label for="ed-p1" class="grow"><b>1ポスト目</b>（フック・問題提起）</label><span class="cnt" id="ed-c1"></span></div>
+          <textarea id="ed-p1" rows="4"></textarea>
+          <div class="row"><label for="ed-p2" class="grow"><b>2ポスト目</b>（答え・回収）</label><span class="cnt" id="ed-c2"></span></div>
+          <textarea id="ed-p2" rows="6"></textarea>
+          <div class="grid3">
+            <label class="f">投稿アカウント<select id="ed-account"></select></label>
+            <label class="f">投稿予定日時<input type="datetime-local" id="ed-date"></label>
+            <label class="f">投稿方法<select id="ed-method"><option value="自動">自動投稿（API・ツリー）</option><option value="手動">手動投稿（コピー）</option></select></label>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="row">
+            <button class="btn danger" id="ed-delete" type="button">削除</button>
+            <button class="btn" id="ed-regen" type="button">再生成を依頼</button>
+            <span class="grow"></span>
+            <button class="btn" id="ed-save" type="button">候補として保存</button>
+            <button class="btn ok" id="ed-adopt" type="button">採用して送信データを作成</button>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="panel">
+          <h2>元ネタ</h2>
+          <div class="small muted" id="ed-src-meta"></div>
+          <div class="src" id="ed-src-ex"></div>
+          <div class="src" id="ed-src-memo"></div>
+        </div>
+        <div class="panel">
+          <h2>スレッドのプレビュー</h2>
+          <div class="thread">
+            <div class="tw"><div class="av" aria-hidden="true"></div><div><div class="small muted" id="pv-acc1"></div><p id="pv-1"></p></div></div>
+            <div class="tw"><div class="av" aria-hidden="true"></div><div><div class="small muted" id="pv-acc2"></div><p id="pv-2"></p></div></div>
+          </div>
+        </div>
+        <div class="panel" id="ed-send-panel" hidden>
+          <div class="row"><h2 class="grow">送信データ</h2><button class="btn sm" id="ed-copy-json" type="button">コピー</button></div>
+          <pre class="json" id="ed-send"></pre>
+          <div class="row">
+            <button class="btn sm" id="ed-copy1" type="button">1ポスト目をコピー</button>
+            <button class="btn sm" id="ed-copy2" type="button">2ポスト目をコピー</button>
+            <a class="btn sm" id="ed-intent" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none">Xの投稿画面を開く</a>
+          </div>
+          <p class="small muted" style="margin:0">手動投稿では、1ポスト目を投稿したあと、そのポストへの返信として2ポスト目を投稿してください。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="view-settings" hidden>
+    <div class="layout">
+      <div class="main">
+        <div class="panel">
+          <h2>接続（この端末に保存）</h2>
+          <label class="f">GAS WebアプリのURL<input type="url" id="st-url" placeholder="https://script.google.com/macros/s/…/exec"></label>
+          <label class="f">認証キー（GASのAPP_KEY）<input type="password" id="st-key" autocomplete="off"></label>
+          <div class="row"><button class="btn" id="st-conn-save" type="button">保存して接続テスト</button><span class="small muted" id="st-conn-msg"></span></div>
+        </div>
+        <div class="panel">
+          <h2>生成指示テンプレート</h2>
+          <p class="small muted" style="margin:0">「空」を生成するときにclaude.ai側で使われます。最後の行「ここにNotionから抽出したポストやメモを貼り付け」が、元ネタの本文抜粋とメモに置き換わります。</p>
+          <textarea id="st-template" rows="18" style="font-family:ui-monospace,monospace;font-size:13px"></textarea>
+          <label class="f">再生成のときに常に付ける指示<textarea id="st-regen" rows="2"></textarea></label>
+        </div>
+        <div class="panel">
+          <h2>文字数チェック（全角換算）</h2>
+          <div class="grid3">
+            <label class="f">1ポスト目 最小<input type="number" id="st-p1min" min="0"></label>
+            <label class="f">1ポスト目 最大<input type="number" id="st-p1max" min="0"></label>
+            <label class="f">2ポスト目 最小<input type="number" id="st-p2min" min="0"></label>
+            <label class="f">2ポスト目 最大<input type="number" id="st-p2max" min="0"></label>
+            <label class="f">上限<input type="number" id="st-limit" min="1"></label>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>パターン</h2>
+          <div id="st-patterns" class="grid3"></div>
+        </div>
+        <div class="panel">
+          <div class="row"><h2 class="grow">アカウント</h2><button class="btn sm" id="st-acc-add" type="button">＋ 追加</button></div>
+          <p class="small muted" style="margin:0">アカウントごとに、扱うネタのタグ・ペルソナ・指示を変えられます。指示テンプレートと再生成指示は、空欄なら共通の設定を使います。</p>
+          <div id="st-accounts" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+        <div class="row"><span class="grow"></span><button class="btn primary" id="st-save" type="button">生成設定を保存</button></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="banner" id="need-conn" hidden>
+    <h2 style="margin-top:0;font-size:16px">接続先を設定してください</h2>
+    <p class="muted">設定画面で、GAS WebアプリのURLと認証キーを入力すると、Notionのデータが表示されます。</p>
+    <a class="btn primary" href="#settings" style="display:inline-flex;align-items:center;text-decoration:none">設定を開く</a>
+  </div>
+</main>
+
+<dialog id="dlg-source">
+  <div class="dlg">
+    <h2>元ネタを選んで追加</h2>
+    <div class="row">
+      <input type="search" id="src-q" placeholder="タイトルで検索" aria-label="タイトルで検索" class="grow">
+      <select id="src-tag" aria-label="タグ"><option value="">すべてのタグ</option></select>
+      <button class="btn" id="src-search" type="button">検索</button>
+    </div>
+    <div class="row">
+      <label class="f grow">追加先のアカウント<select id="src-account"></select></label>
+      <label class="f">絞り込み<select id="src-scope">
+        <option value="assigned">このアカウントが指定されたネタ</option>
+        <option value="tags">このアカウントのタグのネタ</option>
+        <option value="all">すべてのネタ</option>
+      </select></label>
+    </div>
+    <div class="src-list" id="src-list"></div>
+    <div class="row"><button class="btn" id="src-more" type="button" hidden>さらに読み込む</button><span class="grow"></span><button class="btn" data-close type="button">閉じる</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlg-regen">
+  <div class="dlg">
+    <h2>再生成を依頼</h2>
+    <p class="small muted" style="margin:0">作り直すポストを選び、パターンごとに指示を入力してください。状態が「再生成」になり、claude.ai側のキューに入ります。</p>
+    <div class="checks" id="rg-checks"></div>
+    <div id="rg-ins" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div class="small" id="rg-err" style="color:var(--danger)" hidden></div>
+    <div class="row"><span class="grow"></span><button class="btn" data-close type="button">キャンセル</button><button class="btn warn" id="rg-ok" type="button">依頼する</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlg-confirm">
+  <div class="dlg">
+    <h2 id="cf-title"></h2>
+    <p id="cf-body" class="muted" style="margin:0"></p>
+    <div class="row"><span class="grow"></span><button class="btn" id="cf-no" type="button">キャンセル</button><button class="btn" id="cf-yes" type="button"></button></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" hidden></div>
+
+<script>
+'use strict';
+const SLOTS = ['P1-1','P1-2','P2-1','P2-2','P3-1','P3-2'];
+const COLS = [
+  { k:'空', desc:'claude.aiで生成待ち' },
+  { k:'生成済', desc:'AIの案が入った状態（再生成依頼中を含む）', also:['再生成'] },
+  { k:'候補', desc:'編集して採用を判断' },
+  { k:'採用', desc:'送信データ作成済み' }
+];
+const FALLBACK = {
+  template:'', regenAlways:'',
+  ranges:{ p1:{min:80,max:120}, p2:{min:110,max:138}, limit:140 },
+  patterns:[{name:'パターン1',aim:''},{name:'パターン2',aim:''},{name:'パターン3',aim:''}],
+  accounts:[]
+};
+
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k){ try { return localStorage.getItem('xap.'+k) || ''; } catch(e){ return ''; } },
+  set(k,v){ try { localStorage.setItem('xap.'+k, v); } catch(e){} }
+};
+
+const state = { settings: structuredClone(FALLBACK), posts: [], post: null, pattern: '1', dirty: false, srcCursor: null, tags: new Set() };
+
+/* ---------- 通信 ---------- */
+let busyCount = 0;
+function busy(on){ busyCount += on ? 1 : -1; $('#busy').hidden = busyCount <= 0; }
+async function api(action, payload = {}){
+  const url = store.get('url'), key = store.get('key');
+  if (!url || !key) throw new Error('設定画面でGASのURLと認証キーを入力してください');
+  busy(true);
+  try {
+    const res = await fetch(url, { method:'POST', body: JSON.stringify({ ...payload, action, key }) });
+    if (!res.ok) throw new Error('通信に失敗しました（' + res.status + '）');
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || '処理に失敗しました');
+    return j.data;
+  } finally { busy(false); }
+}
+
+/* ---------- 共通 ---------- */
+let toastTimer;
+function toast(msg, isErr){
+  const t = $('#toast'); t.textContent = msg; t.className = isErr ? 'err' : ''; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, isErr ? 6000 : 2500);
+}
+async function run(fn){ try { return await fn(); } catch(e){ toast(e.message || String(e), true); } }
+
+function xLength(s){
+  s = String(s || '');
+  const urlRe = /https?:\/\/\S+/g;
+  let n = (s.match(urlRe) || []).length * 23;
+  s = s.replace(urlRe, '');
+  for (const ch of s){
+    const c = ch.codePointAt(0);
+    const light = c <= 0x10FF || (c >= 0x2000 && c <= 0x200D) || (c >= 0x2010 && c <= 0x201F) || (c >= 0x2032 && c <= 0x2037);
+    n += light ? 1 : 2;
+  }
+  return n;
+}
+const zen = s => Math.ceil(xLength(s) / 2);
+
+function countLabel(text, range, limit){
+  const n = zen(text);
+  let cls = 'near', note = `目安${range.min}〜${range.max}`;
+  if (n > limit){ cls = 'over'; note = `上限${limit}字を超えています`; }
+  else if (n >= range.min && n <= range.max){ cls = 'good'; }
+  return { html: `${n}字（${note}）`, cls };
+}
+
+function fmtDate(iso){
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return iso;
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function toLocalInput(iso){
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fromLocalInput(v){ return v ? new Date(v).toISOString() : ''; }
+
+function patName(n){ const p = state.settings.patterns[Number(n)-1]; return `パターン${n}` + (p && p.name ? ` ${p.name}` : ''); }
+
+function confirmDlg(title, body, yesLabel, danger){
+  return new Promise(resolve => {
+    const d = $('#dlg-confirm');
+    $('#cf-title').textContent = title; $('#cf-body').textContent = body;
+    const yes = $('#cf-yes'); yes.textContent = yesLabel; yes.className = 'btn ' + (danger ? 'danger' : 'primary');
+    const done = v => { d.close(); yes.onclick = null; $('#cf-no').onclick = null; resolve(v); };
+    yes.onclick = () => done(true); $('#cf-no').onclick = () => done(false);
+    d.showModal();
+  });
+}
+document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+
+async function copy(text){
+  try { await navigator.clipboard.writeText(text); toast('コピーしました'); }
+  catch(e){ toast('コピーできませんでした。手動で選択してください', true); }
+}
+
+/* ---------- アカウント ---------- */
+function accountNames(){ return (state.settings.accounts || []).map(a => a.name).filter(Boolean); }
+function fillAccountSelect(sel, current, withAll){
+  const names = accountNames();
+  if (current && names.indexOf(current) < 0) names.push(current);
+  sel.innerHTML = (withAll ? '<option value="">すべて</option>' : '<option value="">未選択</option>') +
+    names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = current || '';
+}
+function defaultMethod(account){
+  const a = (state.settings.accounts || []).find(x => x.name === account);
+  return a && a.method ? a.method : '自動';
+}
+
+/* ---------- ボード ---------- */
+async function loadPosts(){
+  state.posts = await api('listPosts', { account: $('#acc-filter').value || undefined });
+  renderBoard();
+}
+
+function renderBoard(){
+  $('#board').innerHTML = COLS.map(col => {
+    const keys = [col.k].concat(col.also || []);
+    const items = state.posts.filter(p => keys.indexOf(p.status) >= 0);
+    return `<section class="col" data-k="${col.k}" aria-label="${col.k}">
+      <div class="col-h"><h2>${col.k}</h2><span class="small muted">${items.length}</span></div>
+      <div class="small muted" style="padding:0 4px">${col.desc}</div>
+      ${items.length ? items.map(cardHtml).join('') : '<div class="empty">ありません</div>'}
+    </section>`;
+  }).join('');
+}
+
+function cardHtml(p){
+  const meta = [p.account || 'アカウント未選択'];
+  if (p.adoptedPattern) meta.push(patName(p.adoptedPattern));
+  else if (p.slots['P1-1']) meta.push('3パターン');
+  const preview = p.post1 || p.slots['P1-1'] || '';
+  let badge = '';
+  if (p.status === '再生成') badge = `<span class="badge regen">再生成依頼中：${esc(p.regenTargets.join('・'))}</span>`;
+  if (p.status === '採用') badge = `<span class="badge ok">${p.method === '手動' ? '手動' : '自動'}${p.scheduledAt ? ' ' + esc(fmtDate(p.scheduledAt)) : ''}</span>`;
+  const b = (act, label, cls='') => `<button class="btn sm ${cls}" type="button" data-act="${act}" data-id="${p.id}">${label}</button>`;
+  let acts = [];
+  switch (p.status){
+    case '空': acts = [b('open','開く'), b('delete','削除','danger')]; break;
+    case '生成済': acts = [b('toCand','候補にする','primary'), b('open','開く'), b('regen','再生成依頼'), b('delete','削除','danger')]; break;
+    case '再生成': acts = [b('regen','指示を変更'), b('cancelRegen','依頼を取り消す'), b('delete','削除','danger')]; break;
+    case '候補': acts = [b('open','編集して採用','dark'), b('regen','再生成依頼'), b('toGen','生成済へ戻す'), b('delete','削除','danger')]; break;
+    case '採用': acts = [b('open','送信データを見る'), b('toCand','候補へ戻す')]; break;
+  }
+  return `<article class="card ${p.status === '再生成' ? 'is-regen' : ''}">
+    ${badge ? `<div>${badge}</div>` : ''}
+    <div class="small muted">${esc(meta.join('・'))}</div>
+    <div class="ttl">${esc(p.title || '(無題)')}</div>
+    ${preview ? `<div class="pv">${esc(preview)}</div>` : ''}
+    <div class="acts">${acts.join('')}</div>
+  </article>`;
+}
+
+$('#board').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const p = state.posts.find(x => x.id === btn.dataset.id); if (!p) return;
+  run(() => boardAction(btn.dataset.act, p));
+});
+
+async function boardAction(act, p){
+  if (act === 'open'){ location.hash = '#edit/' + p.id; return; }
+  if (act === 'regen'){ openRegen(p); return; }
+  if (act === 'delete'){ await removePost(p); return; }
+  const to = { toCand:'候補', toGen:'生成済', cancelRegen:'生成済' }[act];
+  if (to){ await api('setStatus', { id:p.id, status:to }); toast(`「${to}」にしました`); await loadPosts(); }
+}
+
+async function removePost(p){
+  const ok = await confirmDlg('この投稿を削除しますか？', `「${p.title || '(無題)'}」をNotionのゴミ箱に移します。元ネタ（抽出ポスト①）は残ります。`, '削除する', true);
+  if (!ok) return false;
+  await api('deletePost', { id:p.id });
+  toast('削除しました');
+  await loadPosts();
+  return true;
+}
+
+/* ---------- 元ネタ追加 ---------- */
+function accountOf(name){ return (state.settings.accounts || []).find(a => a.name === name) || null; }
+function syncAccountTags(){
+  const a = accountOf($('#src-account').value);
+  const hasTags = !!(a && a.tags && a.tags.length);
+  const opt = $('#src-scope option[value="tags"]');
+  opt.disabled = !hasTags;
+  opt.textContent = hasTags ? `このアカウントのタグのネタ（${a.tags.join('・')}）` : 'このアカウントのタグのネタ（タグ未設定）';
+  $('#src-scope option[value="assigned"]').disabled = !$('#src-account').value;
+  if ($('#src-scope').selectedOptions[0].disabled) $('#src-scope').value = 'all';
+  $('#src-tag').disabled = $('#src-scope').value === 'tags';
+}
+$('#btn-add').addEventListener('click', () => {
+  fillAccountSelect($('#src-account'), $('#acc-filter').value || (accountNames()[0] || ''), false);
+  syncAccountTags();
+  $('#dlg-source').showModal();
+  run(() => searchSources(false));
+});
+$('#src-account').addEventListener('change', () => { syncAccountTags(); run(() => searchSources(false)); });
+$('#src-scope').addEventListener('change', () => { $('#src-tag').disabled = $('#src-scope').value === 'tags'; run(() => searchSources(false)); });
+$('#src-search').addEventListener('click', () => run(() => searchSources(false)));
+$('#src-q').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); run(() => searchSources(false)); } });
+$('#src-more').addEventListener('click', () => run(() => searchSources(true)));
+
+async function searchSources(more){
+  const account = $('#src-account').value;
+  const acc = accountOf(account);
+  const scope = $('#src-scope').value;
+  const useAccTags = scope === 'tags' && acc && acc.tags.length;
+  const res = await api('listSources', {
+    q: $('#src-q').value.trim() || undefined,
+    assigned: scope === 'assigned' && account ? account : undefined,
+    tags: useAccTags ? acc.tags : ($('#src-tag').value ? [$('#src-tag').value] : undefined),
+    cursor: more ? state.srcCursor : undefined, limit: 30
+  });
+  state.srcCursor = res.next;
+  $('#src-more').hidden = !res.next;
+  res.items.forEach(s => s.tags.forEach(t => state.tags.add(t)));
+  const tagSel = $('#src-tag'), cur = tagSel.value;
+  tagSel.innerHTML = '<option value="">すべてのタグ</option>' + [...state.tags].map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  tagSel.value = cur;
+  const html = res.items.map(s => `<div class="src-item">
+      <div class="row"><b class="grow">${esc(s.title || '(無題)')}</b>${s.generatedCount ? `<span class="badge st">生成${s.generatedCount}件</span>` : ''}</div>
+      ${s.accounts.length ? `<div class="small">対象：${esc(s.accounts.join('・'))}${s.imported.length ? `　<span class="muted">取り込み済み：${esc(s.imported.join('・'))}</span>` : ''}</div>` : ''}
+      <div class="small muted">${esc([s.author, s.likes != null ? 'いいね ' + s.likes : '', s.rts != null ? 'RT ' + s.rts : '', s.tags.join('・')].filter(Boolean).join('　'))}</div>
+      ${s.excerpt ? `<div class="ex">${esc(s.excerpt)}</div>` : ''}
+      <div class="row">${s.postUrl ? `<a class="small" href="${esc(s.postUrl)}" target="_blank" rel="noopener">元の投稿</a>` : ''}<span class="grow"></span><button class="btn sm primary" type="button" data-src="${s.id}">追加</button></div>
+    </div>`).join('');
+  if (more) $('#src-list').insertAdjacentHTML('beforeend', html);
+  else $('#src-list').innerHTML = html || '<div class="empty">見つかりませんでした</div>';
+}
+$('#src-list').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-src]'); if (!btn) return;
+  run(async () => {
+    const account = $('#src-account').value;
+    if (accountNames().length && !account) throw new Error('追加先のアカウントを選んでください');
+    btn.disabled = true;
+    try {
+      await api('createPost', { sourceId: btn.dataset.src, account: account || undefined });
+    } catch (e) {
+      if (!String(e.message).startsWith('DUPLICATE:')) { btn.disabled = false; throw e; }
+      const ok = await confirmDlg('同じネタがすでにあります', e.message.slice(10) + '。もう1件追加しますか？', '追加する', false);
+      if (!ok) { btn.disabled = false; return; }
+      await api('createPost', { sourceId: btn.dataset.src, account, force: true });
+    }
+    btn.textContent = '追加済み';
+    toast('「空」として追加しました');
+    await loadPosts();
+  });
+});
+
+/* ---------- 再生成依頼 ---------- */
+let regenTarget = null;
+function openRegen(p){
+  regenTarget = p;
+  const cur = p.regenTargets || [];
+  $('#rg-checks').innerHTML = SLOTS.map(s => {
+    const [pt, no] = s.slice(1).split('-');
+    return `<label><input type="checkbox" value="${s}" ${cur.indexOf(s) >= 0 ? 'checked' : ''}> パターン${pt}・${no}ポスト目</label>`;
+  }).join('');
+  $('#rg-ins').innerHTML = [1,2,3].map(n => `<label class="f">${esc(patName(n))}への指示<textarea rows="2" data-p="P${n}" placeholder="例：締めをもっと余韻のある一言に">${esc(p.regen['P'+n] || '')}</textarea></label>`).join('');
+  $('#rg-err').hidden = true;
+  $('#dlg-regen').showModal();
+}
+$('#rg-checks').addEventListener('change', () => { $('#rg-err').hidden = true; });
+$('#rg-ok').addEventListener('click', () => run(async () => {
+  const targets = [...document.querySelectorAll('#rg-checks input:checked')].map(i => i.value);
+  if (!targets.length){ $('#rg-err').textContent = '作り直すポストを1つ以上選んでください'; $('#rg-err').hidden = false; return; }
+  const instructions = {};
+  document.querySelectorAll('#rg-ins textarea').forEach(t => { instructions[t.dataset.p] = t.value.trim(); });
+  await api('requestRegen', { id: regenTarget.id, targets, instructions });
+  $('#dlg-regen').close();
+  toast('再生成を依頼しました');
+  if (location.hash.startsWith('#edit/')) await openEdit(regenTarget.id); else await loadPosts();
+}));
+
+/* ---------- 編集 ---------- */
+async function openEdit(id){
+  const p = await api('getPost', { id });
+  state.post = p; state.dirty = false;
+  state.pattern = p.adoptedPattern || '1';
+  $('#ed-title').textContent = p.title || '(無題)';
+  $('#ed-status').textContent = p.status;
+  $('#ed-notion').href = p.url;
+  const generated = SLOTS.some(s => p.slots[s]);
+  $('#ed-empty').hidden = generated;
+  $('#ed-patterns').innerHTML = generated ? [1,2,3].map(n => `<div class="box">
+      <b class="small">${esc(patName(n))}</b>
+      <span class="small muted">1ポスト目　${zen(p.slots[`P${n}-1`])}字</span><p>${esc(p.slots[`P${n}-1`])}</p>
+      <span class="small muted">2ポスト目　${zen(p.slots[`P${n}-2`])}字</span><p>${esc(p.slots[`P${n}-2`])}</p>
+    </div>`).join('') : '';
+  $('#ed-tabs').innerHTML = generated ? '<span class="small muted" style="align-self:center">編集に使うパターン：</span>' + [1,2,3].map(n => `<button class="tab" type="button" data-pat="${n}" aria-pressed="${String(n) === state.pattern}">${esc(patName(n))}</button>`).join('') : '';
+  $('#ed-p1').value = p.post1 || p.slots[`P${state.pattern}-1`] || '';
+  $('#ed-p2').value = p.post2 || p.slots[`P${state.pattern}-2`] || '';
+  fillAccountSelect($('#ed-account'), p.account, false);
+  $('#ed-date').value = toLocalInput(p.scheduledAt);
+  $('#ed-method').value = p.method || defaultMethod(p.account);
+  const editable = ['生成済','候補','採用'].indexOf(p.status) >= 0;
+  ['#ed-p1','#ed-p2'].forEach(s => { $(s).disabled = !generated; });
+  $('#ed-save').disabled = !editable || !generated;
+  $('#ed-adopt').disabled = ['生成済','候補'].indexOf(p.status) < 0 || !generated;
+  $('#ed-regen').disabled = ['生成済','候補','再生成'].indexOf(p.status) < 0;
+  $('#ed-delete').disabled = false;
+  const s = p.source;
+  $('#ed-src-meta').innerHTML = s ? esc([s.title, s.author, s.likes != null ? 'いいね ' + s.likes : '', s.rts != null ? 'RT ' + s.rts : ''].filter(Boolean).join('　')) + (s.postUrl ? `　<a href="${esc(s.postUrl)}" target="_blank" rel="noopener">元の投稿</a>` : '') : '元ネタがありません';
+  $('#ed-src-ex').textContent = s && s.excerpt ? s.excerpt : '（本文抜粋なし）';
+  $('#ed-src-memo').textContent = s && s.memo ? 'メモ：' + s.memo : '（メモなし）';
+  renderSend(p);
+  updateCounts();
+}
+
+function updateCounts(){
+  const r = state.settings.ranges;
+  const a = countLabel($('#ed-p1').value, r.p1, r.limit), b = countLabel($('#ed-p2').value, r.p2, r.limit);
+  $('#ed-c1').textContent = a.html; $('#ed-c1').className = 'cnt ' + a.cls;
+  $('#ed-c2').textContent = b.html; $('#ed-c2').className = 'cnt ' + b.cls;
+  const acc = $('#ed-account').value || '[アカウント]';
+  $('#pv-acc1').textContent = acc; $('#pv-acc2').textContent = acc;
+  $('#pv-1').textContent = $('#ed-p1').value; $('#pv-2').textContent = $('#ed-p2').value;
+}
+['#ed-p1','#ed-p2'].forEach(s => $(s).addEventListener('input', () => { state.dirty = true; updateCounts(); }));
+$('#ed-account').addEventListener('change', () => { $('#ed-method').value = defaultMethod($('#ed-account').value); updateCounts(); });
+
+$('#ed-tabs').addEventListener('click', e => run(async () => {
+  const btn = e.target.closest('button[data-pat]'); if (!btn) return;
+  const n = btn.dataset.pat; if (n === state.pattern) return;
+  if (state.dirty && !(await confirmDlg('編集中の文面を置き換えますか？', `${patName(n)}の文面で、いまの編集内容が上書きされます。`, '置き換える', false))) return;
+  state.pattern = n; state.dirty = false;
+  $('#ed-p1').value = state.post.slots[`P${n}-1`] || '';
+  $('#ed-p2').value = state.post.slots[`P${n}-2`] || '';
+  document.querySelectorAll('#ed-tabs .tab').forEach(t => t.setAttribute('aria-pressed', String(t.dataset.pat === n)));
+  updateCounts();
+}));
+
+function editFields(){
+  return {
+    post1: $('#ed-p1').value.trim(), post2: $('#ed-p2').value.trim(),
+    account: $('#ed-account').value, scheduledAt: fromLocalInput($('#ed-date').value),
+    method: $('#ed-method').value, adoptedPattern: state.pattern
+  };
+}
+
+$('#ed-save').addEventListener('click', () => run(async () => {
+  const p = state.post;
+  await api('savePost', { id: p.id, fields: editFields() });
+  if (p.status === '生成済') await api('setStatus', { id: p.id, status: '候補' });
+  toast('候補として保存しました');
+  await openEdit(p.id);
+}));
+
+$('#ed-adopt').addEventListener('click', () => run(async () => {
+  const f = editFields(), lim = state.settings.ranges.limit;
+  if (!f.post1 || !f.post2) throw new Error('1ポスト目と2ポスト目の両方を入力してください');
+  if (zen(f.post1) > lim || zen(f.post2) > lim) throw new Error(`上限${lim}字を超えているポストがあります`);
+  if (!f.account){
+    if (accountNames().length) throw new Error('投稿アカウントを選んでください');
+    if (!(await confirmDlg('アカウントが未選択です', 'アカウントを選ばずに採用しますか？', '採用する', false))) return;
+  }
+  await api('adopt', { id: state.post.id, pattern: f.adoptedPattern, post1: f.post1, post2: f.post2, account: f.account, scheduledAt: f.scheduledAt, method: f.method });
+  toast('採用して送信データを作成しました');
+  await openEdit(state.post.id);
+}));
+
+$('#ed-regen').addEventListener('click', () => openRegen(state.post));
+$('#ed-delete').addEventListener('click', () => run(async () => { if (await removePost(state.post)) location.hash = '#board'; }));
+
+function renderSend(p){
+  const show = p.status === '採用' && p.sendData;
+  $('#ed-send-panel').hidden = !show;
+  if (!show) return;
+  $('#ed-send').textContent = p.sendData;
+  $('#ed-intent').href = 'https://x.com/intent/post?text=' + encodeURIComponent(p.post1);
+}
+$('#ed-copy-json').addEventListener('click', () => copy(state.post.sendData));
+$('#ed-copy1').addEventListener('click', () => copy(state.post.post1));
+$('#ed-copy2').addEventListener('click', () => copy(state.post.post2));
+
+/* ---------- 設定 ---------- */
+function renderSettings(){
+  const s = state.settings;
+  $('#st-url').value = store.get('url'); $('#st-key').value = store.get('key');
+  $('#st-template').value = s.template || '';
+  $('#st-regen').value = s.regenAlways || '';
+  $('#st-p1min').value = s.ranges.p1.min; $('#st-p1max').value = s.ranges.p1.max;
+  $('#st-p2min').value = s.ranges.p2.min; $('#st-p2max').value = s.ranges.p2.max;
+  $('#st-limit').value = s.ranges.limit;
+  $('#st-patterns').innerHTML = [0,1,2].map(i => `<div style="display:flex;flex-direction:column;gap:6px">
+      <b class="small">パターン${i+1}</b>
+      <label class="f">名前<input type="text" data-pn="${i}" value="${esc((s.patterns[i] || {}).name)}"></label>
+      <label class="f">狙い<input type="text" data-pa="${i}" value="${esc((s.patterns[i] || {}).aim)}"></label>
+    </div>`).join('');
+  renderAccounts();
+}
+function renderAccounts(){
+  const list = state.settings.accounts || [];
+  $('#st-accounts').innerHTML = list.length ? list.map((a, i) => `<div class="acc" data-acc="${i}">
+      <div class="row">
+        <label class="f grow">アカウント名<input type="text" data-k="name" value="${esc(a.name)}" placeholder="@account"></label>
+        <label class="f">既定の投稿方法<select data-k="method"><option value="自動" ${a.method !== '手動' ? 'selected' : ''}>自動投稿</option><option value="手動" ${a.method === '手動' ? 'selected' : ''}>手動投稿</option></select></label>
+        <button class="btn sm danger" type="button" data-ad="${i}" style="align-self:flex-end">削除</button>
+      </div>
+      <label class="f">扱うネタのタグ（抽出ポスト①のタグ、読点か空白区切り）<input type="text" data-k="tags" value="${esc((a.tags || []).join('、'))}" placeholder="例：女目線、官能"></label>
+      <label class="f">ペルソナ・追加指示（指示の最後に足されます）<textarea data-k="persona" rows="3" placeholder="例：30代後半、落ち着いた敬語まじりの口調">${esc(a.persona)}</textarea></label>
+      <details${a.template || a.regenAlways ? ' open' : ''}>
+        <summary class="small">このアカウント専用の指示（空欄なら共通の設定）</summary>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <label class="f">指示テンプレート<textarea data-k="template" rows="8" style="font-family:ui-monospace,monospace;font-size:13px" placeholder="空欄なら共通テンプレートを使います">${esc(a.template)}</textarea></label>
+          <label class="f">再生成のときに常に付ける指示<textarea data-k="regenAlways" rows="2" placeholder="空欄なら共通の指示を使います">${esc(a.regenAlways)}</textarea></label>
+        </div>
+      </details>
+    </div>`).join('') : '<div class="empty">アカウントが登録されていません。1つ以上登録すると、投稿の追加と採用でアカウントの選択が必須になります。</div>';
+}
+function readAccounts(){
+  return [...document.querySelectorAll('#st-accounts [data-acc]')].map(box => {
+    const v = k => box.querySelector(`[data-k="${k}"]`).value;
+    return {
+      name: v('name').trim(), method: v('method'),
+      tags: v('tags').split(/[、,，\s]+/).map(t => t.trim()).filter(Boolean),
+      persona: v('persona').trim(), template: v('template'), regenAlways: v('regenAlways').trim()
+    };
+  });
+}
+$('#st-acc-add').addEventListener('click', () => { state.settings.accounts = readAccounts().concat([{ name:'', method:'自動', tags:[], persona:'', template:'', regenAlways:'' }]); renderAccounts(); });
+$('#st-accounts').addEventListener('click', e => {
+  const b = e.target.closest('[data-ad]'); if (!b) return;
+  const list = readAccounts(); list.splice(Number(b.dataset.ad), 1); state.settings.accounts = list; renderAccounts();
+});
+
+$('#st-conn-save').addEventListener('click', () => run(async () => {
+  store.set('url', $('#st-url').value.trim()); store.set('key', $('#st-key').value.trim());
+  $('#st-conn-msg').textContent = '接続を確認しています…';
+  try {
+    await api('ping');
+    $('#st-conn-msg').textContent = '接続できました';
+    await loadSettings(); renderSettings();
+  } catch(e){ $('#st-conn-msg').textContent = ''; throw e; }
+}));
+
+$('#st-save').addEventListener('click', () => run(async () => {
+  const num = id => Number($(id).value);
+  const ranges = { p1:{ min:num('#st-p1min'), max:num('#st-p1max') }, p2:{ min:num('#st-p2min'), max:num('#st-p2max') }, limit:num('#st-limit') };
+  if ([ranges.p1.min, ranges.p1.max, ranges.p2.min, ranges.p2.max, ranges.limit].some(n => !Number.isFinite(n) || n < 0)) throw new Error('文字数には0以上の数字を入れてください');
+  if (ranges.p1.min > ranges.p1.max || ranges.p2.min > ranges.p2.max) throw new Error('文字数の最小が最大を超えています');
+  const template = $('#st-template').value;
+  if (!template.trim()) throw new Error('生成指示テンプレートを入力してください');
+  const accounts = readAccounts().filter(a => a.name);
+  const names = accounts.map(a => a.name);
+  if (new Set(names).size !== names.length) throw new Error('同じアカウント名が重複しています');
+  const settings = {
+    template, regenAlways: $('#st-regen').value.trim(), ranges,
+    patterns: [0,1,2].map(i => ({ name: $(`[data-pn="${i}"]`).value.trim(), aim: $(`[data-pa="${i}"]`).value.trim() })),
+    accounts
+  };
+  state.settings = await api('saveSettings', { settings });
+  renderSettings(); refreshAccountFilter();
+  toast('生成設定を保存しました');
+}));
+
+async function loadSettings(){
+  state.settings = Object.assign(structuredClone(FALLBACK), await api('getSettings'));
+  refreshAccountFilter();
+}
+function refreshAccountFilter(){
+  const saved = $('#acc-filter').value || store.get('filter');
+  fillAccountSelect($('#acc-filter'), accountNames().indexOf(saved) >= 0 ? saved : '', true);
+}
+
+/* ---------- 画面切り替え ---------- */
+function show(view){
+  ['board','edit','settings'].forEach(v => { $('#view-' + v).hidden = v !== view; });
+  document.querySelectorAll('nav a').forEach(a => a.setAttribute('aria-current', a.dataset.nav === (view === 'edit' ? 'board' : view) ? 'page' : 'false'));
+  const boardTools = view === 'board';
+  $('#acc-filter').disabled = !boardTools; $('#btn-add').hidden = !boardTools; $('#btn-sync').hidden = !boardTools;
+}
+async function route(){
+  const h = location.hash || '#board';
+  const connected = store.get('url') && store.get('key');
+  $('#need-conn').hidden = connected || h === '#settings';
+  if (h === '#settings'){ show('settings'); renderSettings(); return; }
+  if (!connected){ ['board','edit','settings'].forEach(v => { $('#view-' + v).hidden = true; }); return; }
+  if (h.startsWith('#edit/')){ show('edit'); await run(() => openEdit(h.slice(6))); return; }
+  show('board'); await run(loadPosts);
+}
+window.addEventListener('hashchange', route);
+$('#btn-reload').addEventListener('click', route);
+$('#btn-sync').addEventListener('click', () => run(async () => {
+  const r = await api('syncSources');
+  let msg = r.created ? `${r.created}件を「空」として取り込みました` : '新しく取り込むネタはありませんでした';
+  if (r.unknownAccounts.length) msg += `。設定にないアカウントは取り込んでいません：${r.unknownAccounts.join('・')}`;
+  if (r.remaining) msg += `。残り${r.remaining}件はもう一度押すと取り込みます`;
+  toast(msg, r.unknownAccounts.length > 0);
+  await loadPosts();
+}));
+$('#acc-filter').addEventListener('change', () => { store.set('filter', $('#acc-filter').value); run(loadPosts); });
+
+(async function init(){
+  if (store.get('url') && store.get('key')) await run(loadSettings);
+  route();
+})();
+</script>
+</body>
+</html>
