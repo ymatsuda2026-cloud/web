@@ -63,6 +63,30 @@ textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;
 .chip{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:12px}
 .chip[aria-pressed="true"]{background:var(--dark-btn);border-color:var(--dark-btn);color:var(--dark-btn-ink)}
 [hidden]{display:none !important}
+.back{display:none}
+.savebar{position:sticky;bottom:0;z-index:5}
+@media (max-width:760px){
+  body{font-size:15px}
+  header{padding:10px 12px}
+  header>.row{width:100%}
+  header .btn{flex:1 1 auto}
+  h1{font-size:16px}
+  #msg{margin:10px 12px 0}
+  .wrap{padding:12px 12px 24px;gap:12px}
+  aside{max-width:none}
+  body.has-sel aside{display:none}
+  body:not(.has-sel) main{display:none}
+  .back{display:inline-flex;align-items:center;align-self:flex-start}
+  select,input[type=text],textarea{font-size:16px}
+  .btn{min-height:44px}
+  .chip{min-height:40px;padding:0 14px}
+  .q{padding:14px}
+  .panel{padding:14px}
+  .cards{grid-template-columns:1fr}
+  .savebar{margin:0 -12px -24px;border-radius:0;border-left:none;border-right:none;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
+  .savebar .grow{display:none}
+  .savebar .btn{flex:1 1 auto}
+}
 </style>
 </head>
 <body>
@@ -280,7 +304,7 @@ document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () =
   document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === c)));
   renderQueue();
 }));
-window.addEventListener('hashchange', () => { const id = location.hash.slice(1); if (id && state.queue.length) select(id); });
+window.addEventListener('hashchange', () => { const id = location.hash.slice(1); if (id && state.queue.length) select(id); else if (!id && state.selected && !state.busy) { state.selected = null; renderQueue(); renderDetail(); } });
 
 /* ===== 詳細 ===== */
 function workOf(item){
@@ -302,20 +326,30 @@ async function select(id, quiet){
   if (!item) return;
   state.selected = item;
   renderQueue(); renderDetail();
+  if (matchMedia('(max-width:760px)').matches) window.scrollTo(0, 0);
   if (!state.sources.has(item.sourceUrl) && item.sourceUrl){
     try { await loadSource(item); if (state.selected === item) renderDetail(); }
     catch (e){ if (!quiet) say(mcpMessage(e), true); }
   }
 }
 
+function backToList(){
+  if (state.busy) return;
+  state.selected = null;
+  history.replaceState(null, '', location.pathname + location.search);
+  renderQueue(); renderDetail();
+  window.scrollTo(0, 0);
+}
 function renderDetail(){
   const item = state.selected;
+  document.body.classList.toggle('has-sel', !!item);
   if (!item){ $('#detail').innerHTML = '<div class="panel muted">左の一覧から投稿を選んでください。</div>'; return; }
   const w = workOf(item), src = state.sources.get(item.sourceUrl), acc = accountOf(item.account);
   const r = state.settings.ranges;
   const anyLoading = [1,2,3].some(n => w.pats[n].loading);
   const ready = [1,2,3].every(n => w.pats[n].p1 && w.pats[n].p2);
   $('#detail').innerHTML = `
+    <button class="btn back" type="button" id="btn-back">← 一覧に戻る</button>
     <section class="panel">
       <div class="row"><h2 class="grow">${esc(item.title || '(無題)')}</h2><span class="badge ${item.status === '再生成' ? 'regen' : ''}">${esc(item.status)}</span><a class="small" href="${esc(item.url)}" target="_blank" rel="noopener">Notionで開く</a></div>
       <div class="small muted">${item.account ? `${esc(item.account)} の${acc && acc.template ? '専用テンプレート' : '共通テンプレート'}${acc && acc.persona ? 'とペルソナ' : ''}で生成します` : 'アカウント未選択のため、共通テンプレートで生成します'}</div>
@@ -343,7 +377,7 @@ function renderDetail(){
         </div>
         <button class="btn" type="button" data-regen="${n}" ${p.loading || state.busy || w.saving || !(p.p1 || p.p2) ? 'disabled' : ''}>このパターンを再生成</button>
       </article>`; }).join('')}</section>
-    <section class="panel"><div class="row"><span class="grow small muted">3パターンをNotionに書き込み、状態を「生成済」にします</span>
+    <section class="panel savebar"><div class="row"><span class="grow small muted">3パターンをNotionに書き込み、状態を「生成済」にします</span>
       <button class="btn dark" type="button" id="btn-save" ${!ready || anyLoading || state.busy || w.saving ? 'disabled' : ''}>${w.saving ? '登録中…' : 'Notionに登録（生成済へ）'}</button></div></section>`;
 }
 
@@ -366,6 +400,7 @@ $('#detail').addEventListener('change', e => {
   workOf(state.selected).pats[card.dataset.n].target = e.target.value;
 });
 $('#detail').addEventListener('click', e => {
+  if (e.target.id === 'btn-back') { backToList(); return; }
   if (e.target.id === 'btn-gen') onGenerate();
   else if (e.target.id === 'btn-save') onSave();
   else if (e.target.dataset.regen) onRegenOne(Number(e.target.dataset.regen));
