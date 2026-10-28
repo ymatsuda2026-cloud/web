@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>X自動ポスト AI生成</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#F5F6F8;--surface:#FFFFFF;--sunk:#F0F2F5;--ink:#1A1D21;--muted:#555B63;--line:#C9CED4;--hair:#E1E4E8;
+  --accent:#1F4FC4;--accent-ink:#FFFFFF;--accent-soft:#E6EDFB;--accent-soft-ink:#153A94;
+  --warn-soft:#FBE7D3;--warn-ink:#7A3A00;--ok:#1E6B3A;--danger:#A1281B;--danger-soft:#FBE4E1;
+  --dark-btn:#1A1D21;--dark-btn-ink:#FFFFFF;
+  color-scheme:light;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15171A;--surface:#1F2226;--sunk:#272B30;--ink:#ECEDEF;--muted:#A9AEB5;--line:#4A4F56;--hair:#30343A;
+  --accent:#6E95F0;--accent-ink:#0B1530;--accent-soft:#22314F;--accent-soft-ink:#C9D7FA;
+  --warn-soft:#3D2A17;--warn-ink:#F7CFA8;--ok:#6FCB93;--danger:#F08A7E;--danger-soft:#3A1F1C;
+  --dark-btn:#ECEDEF;--dark-btn-ink:#15171A;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#15171A;--surface:#1F2226;--sunk:#272B30;--ink:#ECEDEF;--muted:#A9AEB5;--line:#4A4F56;--hair:#30343A;
+  --accent:#6E95F0;--accent-ink:#0B1530;--accent-soft:#22314F;--accent-soft-ink:#C9D7FA;
+  --warn-soft:#3D2A17;--warn-ink:#F7CFA8;--ok:#6FCB93;--danger:#F08A7E;--danger-soft:#3A1F1C;
+  --dark-btn:#ECEDEF;--dark-btn-ink:#15171A;color-scheme:dark;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans JP",system-ui,sans-serif;font-size:14px;line-height:1.6}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--hair)}
+h1{font-size:18px;margin:0}
+.btn{min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.dark{background:var(--dark-btn);border-color:var(--dark-btn);color:var(--dark-btn-ink);font-weight:700}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grow{flex:1 1 auto}
+.muted{color:var(--muted)}.small{font-size:12px}
+#msg{margin:12px 20px 0;padding:10px 12px;border-radius:8px;background:var(--accent-soft);color:var(--accent-soft-ink)}
+#msg.err{background:var(--danger-soft);color:var(--danger)}
+.wrap{display:flex;flex-wrap:wrap;gap:16px;padding:16px 20px 40px}
+aside{flex:1 1 260px;max-width:320px;display:flex;flex-direction:column;gap:8px}
+main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:14px}
+select,input[type=text]{min-height:40px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);resize:vertical;line-height:1.75}
+.q{text-align:left;padding:12px;border-radius:10px;border:1px solid var(--hair);background:var(--surface);display:flex;flex-direction:column;gap:4px;cursor:pointer;width:100%}
+.q[aria-current="true"]{border:2px solid var(--accent)}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--sunk)}
+.badge.regen{background:var(--warn-soft);color:var(--warn-ink)}
+.panel{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.panel h2{font-size:15px;margin:0}
+.src{background:var(--sunk);border-radius:8px;padding:10px;white-space:pre-wrap;word-break:break-word;font-size:13px}
+.note{background:var(--warn-soft);color:var(--warn-ink);border-radius:8px;padding:10px;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.cnt{font-size:12px}.cnt.good{color:var(--ok)}.cnt.over{color:var(--danger);font-weight:700}.cnt.near{color:var(--muted)}
+.loading{padding:28px 0;text-align:center;color:var(--muted)}
+.err-inline{color:var(--danger);font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:12px}
+.chip[aria-pressed="true"]{background:var(--dark-btn);border-color:var(--dark-btn);color:var(--dark-btn-ink)}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<header>
+  <div class="row"><h1>AI生成ワークベンチ</h1><span class="small muted">状態「生成待ち」「再生成」の投稿を生成します</span></div>
+  <div class="row">
+    <button class="btn" id="btn-load" type="button">Notionから取得</button>
+    <button class="btn primary" id="btn-batch" type="button">表示中をまとめて生成・登録</button>
+  </div>
+</header>
+<div id="msg" role="status" hidden></div>
+
+<div class="wrap">
+  <aside>
+    <label class="small muted" for="f-acc">アカウント</label>
+    <select id="f-acc"><option value="">すべて</option></select>
+    <div class="chips" role="group" aria-label="状態で絞り込み">
+      <button class="chip" type="button" data-st="" aria-pressed="true">すべて</button>
+      <button class="chip" type="button" data-st="生成待ち" aria-pressed="false">生成待ち</button>
+      <button class="chip" type="button" data-st="再生成" aria-pressed="false">再生成</button>
+    </div>
+    <div class="small muted" id="q-count"></div>
+    <div id="queue" style="display:flex;flex-direction:column;gap:8px"></div>
+  </aside>
+
+  <main id="detail">
+    <div class="panel muted" id="empty">左の一覧から投稿を選んでください。</div>
+  </main>
+</div>
+
+<script>
+'use strict';
+/* ===== Notion の場所 ===== */
+const NOTION = 'Notion';
+const DS = {
+  gen: 'collection://97753aa5-d6ca-478d-b14f-8fcf07c7f031', // 生成ポスト
+  set: 'collection://e23069e7-054c-4d6e-887a-cb8a7d483ffa'  // 自動ポスト設定
+};
+const SLOTS = ['P1-1','P1-2','P2-1','P2-2','P3-1','P3-2'];
+const PLACEHOLDER = 'ここにNotionから抽出したポストやメモを貼り付け';
+const DEFAULTS = {
+  template: '',
+  regenAlways: '前回の文面と同じ言い回しを避ける。',
+  ranges: { p1:{min:80,max:120}, p2:{min:110,max:138}, limit:140 },
+  patterns: [
+    { name:'王道・共感重視', aim:'保存・いいね狙い' },
+    { name:'心理描写・大人の色気重視', aim:'妄想・興奮を刺激' },
+    { name:'短尺・辛口フック', aim:'インプレッション狙い' }
+  ],
+  accounts: []
+};
+
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const state = { settings: structuredClone(DEFAULTS), queue: [], selected: null, work: new Map(), sources: new Map(), st: '', acc: '', busy: false };
+let mcp = null, sample = null;
+
+/* ===== 表示 ===== */
+function say(text, isErr){ const m = $('#msg'); m.textContent = text; m.className = isErr ? 'err' : ''; m.hidden = !text; }
+
+function xLength(s){
+  s = String(s || '');
+  const urlRe = /https?:\/\/\S+/g;
+  let n = (s.match(urlRe) || []).length * 23;
+  s = s.replace(urlRe, '');
+  for (const ch of s){
+    const c = ch.codePointAt(0);
+    const light = c <= 0x10FF || (c >= 0x2000 && c <= 0x200D) || (c >= 0x2010 && c <= 0x201F) || (c >= 0x2032 && c <= 0x2037);
+    n += light ? 1 : 2;
+  }
+  return n;
+}
+const zen = s => Math.ceil(xLength(s) / 2);
+function countHtml(text, range){
+  const n = zen(text), lim = state.settings.ranges.limit;
+  const cls = n > lim ? 'over' : (n >= range.min && n <= range.max ? 'good' : 'near');
+  return `<span class="cnt ${cls}">${n}字${n > lim ? `（上限${lim}超）` : `（目安${range.min}〜${range.max}）`}</span>`;
+}
+
+/* ===== Notion のテキスト（マークダウン）変換 ===== */
+// 読み：<br /> を改行に、\* などのエスケープを外す
+function fromNotion(s){
+  return String(s ?? '').replace(/<br\s*\/?>/g, '\n').replace(/\\([\\`*_{}\[\]()#+\-.!|<>~])/g, '$1');
+}
+// 書き：マークダウンとして解釈される記号をエスケープ（改行はそのまま）
+function toNotion(s){
+  return String(s ?? '').replace(/([\\`*_~\[\]<>])/g, '\\$1');
+}
+const pageId = url => (String(url).match(/[0-9a-f]{32}/) || [''])[0];
+function parseJsonText(s, fallback){ try { const v = JSON.parse(s); return v ?? fallback; } catch(e){ return fallback; } }
+
+/* ===== Notion 呼び出し ===== */
+function mcpMessage(e){
+  const c = e && e.code;
+  switch (c){
+    case 'needs_reauth': return 'Notionの接続が切れています。claude.aiの「設定」→「コネクタ」でNotionを再接続してください。';
+    case 'server_not_connected': return 'Notionコネクタが接続されていません。claude.aiの「設定」→「コネクタ」でNotionを追加してください。';
+    case 'selection_required': return 'Notionコネクタが複数あります。表示される選択画面で、使うものを選んでください。';
+    case 'not_in_manifest': return 'このページでのNotionの利用が許可されていません。ページ右上の権限設定でNotionを許可してください。';
+    case 'approval_required': return 'Notionの操作には承認が必要です。もう一度ボタンを押して、表示される確認で許可してください。';
+    case 'blocked_by_policy': return '組織のポリシーで、この操作は許可されていません。';
+    case 'server_unavailable': return 'Notionに一時的につながりません。少し待ってから、もう一度お試しください。';
+    case 'not_granted': case 'capability_disabled': case 'capability_removed': return 'この表示ではNotionを使えません。claude.aiでこのページを開いてください。';
+    case 'tool_error': return 'Notionがエラーを返しました：' + (e.message || '');
+    default: return 'Notionとの通信に失敗しました（' + (c || '不明') + '）：' + ((e && e.message) || '');
+  }
+}
+async function notionRead(tool, input){
+  if (!mcp) throw { code:'capability_disabled' };
+  try { return (await mcp.callTool(NOTION, tool, input, { cache:false })).payload; }
+  catch (e){
+    if (e && e.retryable){
+      await new Promise(r => setTimeout(r, Math.min(e.retryAfterMs || 0, 5000) + 800 + Math.random() * 700));
+      return (await mcp.callTool(NOTION, tool, input, { cache:false })).payload;
+    }
+    throw e;
+  }
+}
+async function notionWrite(pageUrl, properties){
+  if (!mcp) throw { code:'capability_disabled' };
+  return (await mcp.callTool(NOTION, 'notion-update-page', { page_id: pageId(pageUrl), command:'update_properties', properties })).payload;
+}
+async function queryRows(dataSourceUrl, filter, limit){
+  const data = { mode:'rows', data_source_url: dataSourceUrl, limit: limit || 100 };
+  if (filter) data.filter = filter;
+  const p = await notionRead('notion-query-data-sources', { data });
+  return (p && p.results) || [];
+}
+
+/* ===== 読み込み ===== */
+async function loadSettings(){
+  const rows = await queryRows(DS.set, null, 50);
+  const s = structuredClone(DEFAULTS);
+  rows.forEach(r => {
+    const key = fromNotion(r['キー']);
+    if (!(key in s)) return;
+    const v = parseJsonText(fromNotion(r['値']), undefined);
+    if (v !== undefined) s[key] = v;
+  });
+  s.accounts = Array.isArray(s.accounts) ? s.accounts : [];
+  state.settings = s;
+}
+
+async function loadQueue(){
+  const filter = { type:'group', operator:'or', filters: ['生成待ち','再生成'].map(v => ({ type:'property', property:'状態', propertyType:'select', operator:'enum_is', value:{ type:'exact', value:v } })) };
+  const rows = await queryRows(DS.gen, filter, 100);
+  state.queue = rows.map(r => ({
+    url: r.url,
+    id: pageId(r.url),
+    title: fromNotion(r['タイトル']),
+    status: r['状態'],
+    account: r['アカウント'] && r['アカウント'] !== '未設定' ? r['アカウント'] : '',
+    sourceUrl: (parseJsonText(r['元ネタ'] || '[]', [])[0]) || '',
+    targets: parseJsonText(r['再生成対象'] || '[]', []),
+    regen: { P1: fromNotion(r['再生成指示P1']), P2: fromNotion(r['再生成指示P2']), P3: fromNotion(r['再生成指示P3']) },
+    slots: Object.fromEntries(SLOTS.map(s => [s, fromNotion(r[s])])),
+    updated: r['更新日時'] || ''
+  })).sort((a, b) => a.updated < b.updated ? 1 : -1);
+}
+
+async function loadSource(item){
+  if (!item.sourceUrl) return null;
+  if (state.sources.has(item.sourceUrl)) return state.sources.get(item.sourceUrl);
+  const p = await notionRead('notion-fetch', { id: pageId(item.sourceUrl) });
+  const m = String((p && p.text) || '').match(/<properties>\s*([\s\S]*?)\s*<\/properties>/);
+  const props = m ? parseJsonText(m[1], {}) : {};
+  const src = {
+    title: fromNotion(props['タイトル']), author: fromNotion(props['投稿者']), postUrl: props['投稿URL'] || '',
+    excerpt: fromNotion(props['本文抜粋']), memo: fromNotion(props['メモ']),
+    likes: props['いいね数'], rts: props['RT数']
+  };
+  state.sources.set(item.sourceUrl, src);
+  return src;
+}
+
+async function reload(){
+  if (state.busy) return;
+  say('Notionから読み込んでいます…');
+  try {
+    await loadSettings();
+    await loadQueue();
+    renderFilters(); renderQueue();
+    const want = (location.hash || '').slice(1);
+    const pick = state.queue.find(q => q.id === want) || (state.selected && state.queue.find(q => q.id === state.selected.id));
+    if (pick) await select(pick.id, true);
+    else if (want) { renderDetail(); say('指定された投稿は生成待ちではありません（すでに生成済みか、削除された可能性があります）。', true); return; }
+    else renderDetail();
+    say(state.queue.length ? `${state.queue.length}件の生成待ちがあります。` : '生成待ちの投稿はありません。');
+  } catch (e){ say(mcpMessage(e), true); }
+}
+
+/* ===== 一覧 ===== */
+function shown(){ return state.queue.filter(q => (!state.acc || q.account === state.acc) && (!state.st || q.status === state.st)); }
+function renderFilters(){
+  const accs = [...new Set(state.queue.map(q => q.account))];
+  const sel = $('#f-acc'), cur = state.acc;
+  sel.innerHTML = '<option value="">すべて</option>' + accs.map(a => `<option value="${esc(a)}">${esc(a || 'アカウント未選択')}（${state.queue.filter(q => q.account === a).length}）</option>`).join('');
+  sel.value = accs.indexOf(cur) >= 0 ? cur : '';
+  state.acc = sel.value;
+}
+function renderQueue(){
+  const list = shown();
+  $('#q-count').textContent = `${list.length}件`;
+  $('#queue').innerHTML = list.length ? list.map(q => `<button class="q" type="button" data-id="${q.id}" aria-current="${state.selected && state.selected.id === q.id}">
+      <span class="row"><span class="badge ${q.status === '再生成' ? 'regen' : ''}">${esc(q.status)}</span><span class="small muted">${esc(q.account || 'アカウント未選択')}</span></span>
+      <span>${esc(q.title || '(無題)')}</span>
+      ${q.status === '再生成' ? `<span class="small muted">対象：${esc(q.targets.join('・') || '未指定')}</span>` : ''}
+    </button>`).join('') : '<div class="small muted">表示する投稿はありません。</div>';
+}
+$('#queue').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b && !state.busy) { location.hash = b.dataset.id; } });
+$('#f-acc').addEventListener('change', e => { state.acc = e.target.value; renderQueue(); });
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  state.st = c.dataset.st;
+  document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === c)));
+  renderQueue();
+}));
+window.addEventListener('hashchange', () => { const id = location.hash.slice(1); if (id && state.queue.length) select(id); });
+
+/* ===== 詳細 ===== */
+function workOf(item){
+  if (!state.work.has(item.id)){
+    const pats = {};
+    [1,2,3].forEach(n => {
+      pats[n] = { p1:'', p2:'', loading:false, error:'', target:'both', ins:'' };
+      if (item.status === '再生成'){ pats[n].p1 = item.slots[`P${n}-1`]; pats[n].p2 = item.slots[`P${n}-2`]; }
+    });
+    state.work.set(item.id, { extra:'', pats, saving:false });
+  }
+  return state.work.get(item.id);
+}
+function accountOf(name){ return (state.settings.accounts || []).find(a => a.name === name) || null; }
+function patInfo(n){ const p = state.settings.patterns[n-1] || DEFAULTS.patterns[n-1]; return { name: p.name || `パターン${n}`, aim: p.aim || '' }; }
+
+async function select(id, quiet){
+  const item = state.queue.find(q => q.id === id);
+  if (!item) return;
+  state.selected = item;
+  renderQueue(); renderDetail();
+  if (!state.sources.has(item.sourceUrl) && item.sourceUrl){
+    try { await loadSource(item); if (state.selected === item) renderDetail(); }
+    catch (e){ if (!quiet) say(mcpMessage(e), true); }
+  }
+}
+
+function renderDetail(){
+  const item = state.selected;
+  if (!item){ $('#detail').innerHTML = '<div class="panel muted">左の一覧から投稿を選んでください。</div>'; return; }
+  const w = workOf(item), src = state.sources.get(item.sourceUrl), acc = accountOf(item.account);
+  const r = state.settings.ranges;
+  const anyLoading = [1,2,3].some(n => w.pats[n].loading);
+  const ready = [1,2,3].every(n => w.pats[n].p1 && w.pats[n].p2);
+  $('#detail').innerHTML = `
+    <section class="panel">
+      <div class="row"><h2 class="grow">${esc(item.title || '(無題)')}</h2><span class="badge ${item.status === '再生成' ? 'regen' : ''}">${esc(item.status)}</span><a class="small" href="${esc(item.url)}" target="_blank" rel="noopener">Notionで開く</a></div>
+      <div class="small muted">${item.account ? `${esc(item.account)} の${acc && acc.template ? '専用テンプレート' : '共通テンプレート'}${acc && acc.persona ? 'とペルソナ' : ''}で生成します` : 'アカウント未選択のため、共通テンプレートで生成します'}</div>
+      ${src ? `<div class="small muted">${esc([src.author, src.likes != null ? 'いいね ' + src.likes : '', src.rts != null ? 'RT ' + src.rts : ''].filter(Boolean).join('　'))}${src.postUrl ? `　<a href="${esc(src.postUrl)}" target="_blank" rel="noopener">元の投稿</a>` : ''}</div>
+        <div class="src">${esc(src.excerpt || '（本文抜粋なし）')}</div>${src.memo ? `<div class="src">メモ：${esc(src.memo)}</div>` : ''}`
+        : `<div class="small muted">${item.sourceUrl ? '元ネタを読み込んでいます…' : '元ネタがありません'}</div>`}
+      ${item.status === '再生成' ? `<div class="note"><b>再生成の依頼：${esc(item.targets.join('・') || '対象未指定')}</b>${[1,2,3].map(n => item.regen['P'+n] ? `<br>パターン${n}：${esc(item.regen['P'+n])}` : '').join('')}<br><span class="small">対象外のポストはいまの文面のまま残ります。</span></div>`
+        : `<label class="small"><b>今回だけの追加指示（任意）</b><textarea id="extra" rows="2" placeholder="例：今回は季節感を入れて">${esc(w.extra)}</textarea></label>`}
+      <div class="row"><span class="grow small muted">指示はNotionの「自動ポスト設定」から読み込みます</span>
+        <button class="btn primary" type="button" id="btn-gen" ${anyLoading || state.busy || w.saving || !src && item.sourceUrl ? 'disabled' : ''}>${anyLoading ? '生成中…' : item.status === '再生成' ? '依頼どおりに再生成' : '3パターン生成'}</button></div>
+    </section>
+    <section class="cards">${[1,2,3].map(n => {
+      const p = w.pats[n], info = patInfo(n);
+      return `<article class="card" data-n="${n}">
+        <div><b>パターン${n}</b><div class="small muted">${esc(info.name)}${info.aim ? '（' + esc(info.aim) + '）' : ''}</div></div>
+        ${p.loading ? '<div class="loading">作成中…</div>' : `
+          <div class="row"><span class="grow small"><b>1ポスト目</b></span>${countHtml(p.p1, r.p1)}</div>
+          <textarea rows="5" data-f="p1" aria-label="パターン${n}の1ポスト目">${esc(p.p1)}</textarea>
+          <div class="row"><span class="grow small"><b>2ポスト目</b></span>${countHtml(p.p2, r.p2)}</div>
+          <textarea rows="6" data-f="p2" aria-label="パターン${n}の2ポスト目">${esc(p.p2)}</textarea>`}
+        ${p.error ? `<div class="err-inline">${esc(p.error)}</div>` : ''}
+        <div class="row">
+          <select data-f="target" aria-label="パターン${n}の再生成対象"><option value="both" ${p.target === 'both' ? 'selected' : ''}>両方</option><option value="1" ${p.target === '1' ? 'selected' : ''}>1ポスト目</option><option value="2" ${p.target === '2' ? 'selected' : ''}>2ポスト目</option></select>
+          <input type="text" class="grow" data-f="ins" value="${esc(p.ins)}" placeholder="再生成の指示" aria-label="パターン${n}への再生成指示" style="min-width:0">
+        </div>
+        <button class="btn" type="button" data-regen="${n}" ${p.loading || state.busy || w.saving || !(p.p1 || p.p2) ? 'disabled' : ''}>このパターンを再生成</button>
+      </article>`; }).join('')}</section>
+    <section class="panel"><div class="row"><span class="grow small muted">3パターンをNotionに書き込み、状態を「生成済」にします</span>
+      <button class="btn dark" type="button" id="btn-save" ${!ready || anyLoading || state.busy || w.saving ? 'disabled' : ''}>${w.saving ? '登録中…' : 'Notionに登録（生成済へ）'}</button></div></section>`;
+}
+
+$('#detail').addEventListener('input', e => {
+  const item = state.selected; if (!item) return;
+  const w = workOf(item);
+  if (e.target.id === 'extra'){ w.extra = e.target.value; return; }
+  const card = e.target.closest('[data-n]'); const f = e.target.dataset.f;
+  if (!card || !f) return;
+  w.pats[card.dataset.n][f] = e.target.value;
+  if (f === 'p1' || f === 'p2'){
+    const range = state.settings.ranges[f];
+    e.target.previousElementSibling.lastElementChild.outerHTML = countHtml(e.target.value, range);
+    const ready = [1,2,3].every(n => w.pats[n].p1 && w.pats[n].p2);
+    const save = $('#btn-save'); if (save && !w.saving) save.disabled = !ready;
+  }
+});
+$('#detail').addEventListener('change', e => {
+  const card = e.target.closest('[data-n]'); if (!card || e.target.dataset.f !== 'target') return;
+  workOf(state.selected).pats[card.dataset.n].target = e.target.value;
+});
+$('#detail').addEventListener('click', e => {
+  if (e.target.id === 'btn-gen') onGenerate();
+  else if (e.target.id === 'btn-save') onSave();
+  else if (e.target.dataset.regen) onRegenOne(Number(e.target.dataset.regen));
+});
+
+/* ===== 生成 ===== */
+function buildBase(item, src){
+  const acc = accountOf(item.account);
+  let tpl = (acc && acc.template) || state.settings.template || '';
+  const material = [src && src.excerpt ? src.excerpt : '', src && src.memo ? 'メモ：' + src.memo : ''].filter(Boolean).join('\n\n') || '（元ネタなし）';
+  tpl = tpl ? (tpl.indexOf(PLACEHOLDER) >= 0 ? tpl.replace(PLACEHOLDER, material) : tpl + '\n\n【元のポスト・メモ】\n' + material)
+            : 'X向けの2連スレッド投稿を作成してください。\n\n【元のポスト・メモ】\n' + material;
+  if (acc && acc.persona) tpl += '\n\n【このアカウントのペルソナ・追加指示】\n' + acc.persona;
+  return { text: tpl, regenAlways: (acc && acc.regenAlways) || state.settings.regenAlways || '' };
+}
+function outputSpec(n){
+  const r = state.settings.ranges, info = patInfo(n);
+  return `---\n【アプリからの出力指定】\n上の指示のうち、パターン${n}（${info.name}${info.aim ? '：' + info.aim : ''}）の1案だけを作成してください。他のパターンは作りません。\n1ポスト目は全角${r.p1.min}〜${r.p1.max}字、2ポスト目は全角${r.p2.min}〜${r.p2.max}字、どちらも全角${r.limit}字以内を厳守。\n本文に見出し・文字数の表記・「1ポスト目」などのラベルは入れないでください。\n出力はJSONオブジェクト1つだけ：{"p1":"1ポスト目の本文","p2":"2ポスト目の本文"}`;
+}
+function promptNew(item, src, n, extra){
+  const b = buildBase(item, src);
+  return `${b.text}${extra ? '\n\n【今回だけの追加指示】\n' + extra : ''}\n\n${outputSpec(n)}`;
+}
+function promptRegen(item, src, n, cur, target, ins){
+  const b = buildBase(item, src);
+  const which = target === '1' ? '1ポスト目だけ' : target === '2' ? '2ポスト目だけ' : '1ポスト目と2ポスト目の両方';
+  return `${b.text}\n\n【いまのパターン${n}】\n1ポスト目：\n${cur.p1}\n\n2ポスト目：\n${cur.p2}\n\n【作り直し】\nパターン${n}の${which}を作り直してください。\n作り直しの指示：${ins || '（特になし。より良い表現に）'}${b.regenAlways ? '\n常に守ること：' + b.regenAlways : ''}\n\n${outputSpec(n)}\n作り直さないポストは、いまの文面をそのまま入れてください。`;
+}
+function sampleMessage(e){
+  switch (e && e.code){
+    case 'not_granted': return 'AIでの生成が許可されていません。ページの権限設定で許可してください。';
+    case 'rate_limited': return 'AIの利用が混み合っています。少し待ってから、もう一度お試しください。';
+    case 'invalid_json': return 'AIの返答を読み取れませんでした。もう一度お試しください。';
+    default: return 'AIでの生成に失敗しました' + (e && e.message ? '：' + e.message : '') + '。';
+  }
+}
+async function runPattern(item, n, prompt, keep){
+  const w = workOf(item), p = w.pats[n];
+  if (!sample) throw new Error('この表示ではAIを使えません。claude.aiでこのページを開いてください。');
+  p.loading = true; p.error = '';
+  if (state.selected === item) renderDetail();
+  try {
+    const r = await sample.json(prompt, { modelTier:'default', cache:false });
+    if (!r || typeof r.p1 !== 'string' || typeof r.p2 !== 'string') throw { code:'invalid_json' };
+    p.p1 = keep === '2' ? p.p1 : r.p1.trim();
+    p.p2 = keep === '1' ? p.p2 : r.p2.trim();
+  } catch (e){
+    p.error = e instanceof Error ? e.message : sampleMessage(e);
+    throw p.error;
+  } finally {
+    p.loading = false;
+    if (state.selected === item) renderDetail();
+  }
+}
+
+async function generateItem(item){
+  const src = await loadSource(item);
+  const w = workOf(item);
+  const jobs = [1,2,3].map(n => {
+    if (item.status === '再生成'){
+      const t1 = item.targets.indexOf(`P${n}-1`) >= 0, t2 = item.targets.indexOf(`P${n}-2`) >= 0;
+      if (!t1 && !t2) return Promise.resolve();
+      const target = t1 && t2 ? 'both' : t1 ? '1' : '2';
+      const cur = { p1: item.slots[`P${n}-1`], p2: item.slots[`P${n}-2`] };
+      w.pats[n].p1 = cur.p1; w.pats[n].p2 = cur.p2;
+      return runPattern(item, n, promptRegen(item, src, n, cur, target, item.regen['P' + n]), target === 'both' ? '' : target);
+    }
+    return runPattern(item, n, promptNew(item, src, n, w.extra.trim()));
+  });
+  const res = await Promise.allSettled(jobs);
+  const failed = res.filter(r => r.status === 'rejected').length;
+  if (failed) throw new Error(`${failed}パターンの生成に失敗しました。カードの「このパターンを再生成」でやり直せます。`);
+}
+
+async function onGenerate(){
+  const item = state.selected; if (!item) return;
+  say('3パターンを生成しています…');
+  try { await generateItem(item); say('生成しました。内容を確認して「Notionに登録」を押してください。'); }
+  catch (e){ say(e.message || String(e), true); }
+}
+
+async function onRegenOne(n){
+  const item = state.selected, w = workOf(item), p = w.pats[n];
+  say(`パターン${n}を作り直しています…`);
+  try {
+    const src = await loadSource(item);
+    await runPattern(item, n, promptRegen(item, src, n, { p1:p.p1, p2:p.p2 }, p.target, p.ins.trim()), p.target === 'both' ? '' : p.target);
+    say(`パターン${n}を作り直しました。`);
+  } catch (e){ say(typeof e === 'string' ? e : (e.message || String(e)), true); }
+}
+
+/* ===== 登録 ===== */
+async function saveItem(item){
+  const w = workOf(item), lim = state.settings.ranges.limit;
+  const texts = [1,2,3].flatMap(n => [w.pats[n].p1, w.pats[n].p2]);
+  if (texts.some(t => !t.trim())) throw new Error('空のポストがあります。生成するか入力してください。');
+  if (texts.some(t => zen(t) > lim)) throw new Error(`上限${lim}字を超えているポストがあります。編集か再生成をしてください。`);
+  w.saving = true; if (state.selected === item) renderDetail();
+  try {
+    const props = { '状態':'生成済', '再生成対象': null };
+    [1,2,3].forEach(n => { props[`P${n}-1`] = toNotion(w.pats[n].p1.trim()); props[`P${n}-2`] = toNotion(w.pats[n].p2.trim()); });
+    await notionWrite(item.url, props);
+    state.queue = state.queue.filter(q => q.id !== item.id);
+    state.work.delete(item.id);
+  } catch (e){
+    throw new Error(e && e.code ? mcpMessage(e) + (e.code === 'server_unavailable' || e.code === 'upstream_error' ? '（書き込まれている可能性があるので、「Notionから取得」で確認してから登録し直してください）' : '') : (e.message || String(e)));
+  } finally { w.saving = false; }
+}
+
+async function onSave(){
+  const item = state.selected; if (!item) return;
+  say('Notionに登録しています…');
+  try {
+    await saveItem(item);
+    const next = shown()[0];
+    state.selected = null;
+    renderFilters(); renderQueue();
+    if (next) location.hash = next.id; else { history.replaceState(null, '', location.pathname + location.search); renderDetail(); }
+    say(`「${item.title}」を生成済にしました。`);
+  } catch (e){ renderDetail(); say(e.message || String(e), true); }
+}
+
+async function onBatch(){
+  const list = shown(); if (!list.length || state.busy) return;
+  state.busy = true; $('#btn-batch').disabled = true; $('#btn-load').disabled = true;
+  let ok = 0; const errors = [];
+  for (let i = 0; i < list.length; i++){
+    const item = list[i];
+    $('#btn-batch').textContent = `まとめて生成中 ${i + 1}/${list.length}`;
+    state.selected = item; renderQueue(); renderDetail();
+    try { await generateItem(item); await saveItem(item); ok++; renderQueue(); }
+    catch (e){ errors.push(`${item.title}：${e.message || e}`); }
+  }
+  state.busy = false; $('#btn-batch').disabled = false; $('#btn-load').disabled = false; $('#btn-batch').textContent = '表示中をまとめて生成・登録';
+  state.selected = null; renderFilters(); renderQueue(); renderDetail();
+  say(errors.length ? `${ok}件を登録しました。${errors.length}件は失敗しました：${errors.join(' ／ ')}` : `${ok}件をすべて生成済にしました。`, errors.length > 0);
+}
+
+$('#btn-load').addEventListener('click', reload);
+$('#btn-batch').addEventListener('click', onBatch);
+
+/* ===== 起動 ===== */
+(async function init(){
+  say('準備しています…');
+  if (!window.claude || !window.claude.use){ say('このページはclaude.aiで開いてください。', true); return; }
+  [mcp, sample] = await Promise.all([claude.use('mcp'), claude.use('sample')]);
+  if (!mcp){ say('この表示ではNotionを使えません。claude.aiでこのページを開き、Notionコネクタを接続してください。', true); return; }
+  if (!sample) say('この表示ではAI生成を使えません。一覧の確認だけできます。', true);
+  await reload();
+})();
+</script>
+</body>
+</html>

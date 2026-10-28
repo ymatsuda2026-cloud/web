@@ -5,7 +5,7 @@
  * 「抽出ポスト①」（元ネタ）「生成ポスト①」「自動ポスト設定」を読み書きする。
  *
  * 抽出ポスト①の「アカウント」に指定されたアカウントごとに、生成ポスト①へ
- * 状態「空」の行を自動で作る（syncSources。installTrigger で15分ごとに実行）。
+ * 状態「生成待ち」の行を自動で作る（syncSources。installTrigger で15分ごとに実行）。
  *
  * スクリプトプロパティ（プロジェクトの設定 > スクリプト プロパティ）
  *   NOTION_TOKEN  : Notion インテグレーションのシークレット
@@ -19,12 +19,12 @@
  */
 
 const NOTION_VERSION = '2022-06-28';
-const STATUSES = ['空', '生成済', '候補', '採用', '再生成'];
+const STATUSES = ['生成待ち', '生成済', '候補', '採用', '再生成'];
 const SLOTS = ['P1-1', 'P1-2', 'P2-1', 'P2-2', 'P3-1', 'P3-2'];
 const PATTERNS = ['1', '2', '3'];
 
 // setStatus で許す状態の移動（移動元 → 移動先）
-// 空→生成済 と 再生成→生成済（生成結果つき）は saveGenerated、→採用 は adopt で行う
+// 生成待ち→生成済 と 再生成→生成済（生成結果つき）は saveGenerated、→採用 は adopt で行う
 const TRANSITIONS = {
   '生成済': ['候補'],
   '候補': ['生成済'],
@@ -248,9 +248,9 @@ function listPosts_(req) {
   return rows.map(mapPost_);
 }
 
-// claude.ai 側の生成キュー：空・再生成の行と、元ネタの本文抜粋・メモ
+// claude.ai 側の生成キュー：生成待ち・再生成の行と、元ネタの本文抜粋・メモ
 function listQueue_() {
-  const posts = listPosts_({ statuses: ['空', '再生成'] });
+  const posts = listPosts_({ statuses: ['生成待ち', '再生成'] });
   const cache = {};
   posts.forEach(p => {
     const sid = p.sourceIds[0];
@@ -276,7 +276,7 @@ function mapPost_(p) {
     id: p.id,
     url: p.url,
     title: text_(pr['タイトル']),
-    status: sel_(pr['状態']) || '空',
+    status: normStatus_(sel_(pr['状態'])),
     account: sel_(pr['アカウント']),
     sourceIds: ((pr['元ネタ'] && pr['元ネタ'].relation) || []).map(r => r.id),
     slots: slots,
@@ -309,7 +309,7 @@ function createPost_(req) {
   const props = {
     'タイトル': { title: rt_(src.title || '(無題)') },
     '元ネタ': { relation: [{ id: src.id }] },
-    '状態': { select: { name: '空' } }
+    '状態': { select: { name: '生成待ち' } }
   };
   if (account) props['アカウント'] = { select: { name: account } };
   const created = mapPost_(notion_('post', '/pages', { parent: { database_id: cfg_('GEN_DB') }, properties: props }));
@@ -327,7 +327,7 @@ function markImported_(src, names) {
 }
 
 // 抽出ポスト①の「アカウント」にあって「取り込み済み」にないアカウントの分だけ、
-// 生成ポスト①に「空」の行を作る。生成ポスト①の行を削除しても作り直さない
+// 生成ポスト①に「生成待ち」の行を作る。生成ポスト①の行を削除しても作り直さない
 // （作り直したいときは抽出ポスト①の「取り込み済み」からそのアカウントを外す）
 function syncSources_() {
   const settings = getSettings_();
@@ -359,7 +359,7 @@ function syncSources_() {
           properties: {
             'タイトル': { title: rt_(src.title || '(無題)') },
             '元ネタ': { relation: [{ id: src.id }] },
-            '状態': { select: { name: '空' } },
+            '状態': { select: { name: '生成待ち' } },
             'アカウント': { select: { name: account } }
           }
         });
@@ -460,7 +460,7 @@ function requestRegen_(req) {
 function saveGenerated_(req) {
   need_(req.id, 'id');
   const cur = mapPost_(notion_('get', '/pages/' + req.id));
-  if (['空', '再生成'].indexOf(cur.status) < 0) throw new Error('「' + cur.status + '」の投稿には生成結果を書き込めません');
+  if (['生成待ち', '再生成'].indexOf(cur.status) < 0) throw new Error('「' + cur.status + '」の投稿には生成結果を書き込めません');
   const slots = req.slots || {};
   const props = { '状態': { select: { name: '生成済' } }, '再生成対象': { multi_select: [] } };
   SLOTS.forEach(s => { if (s in slots) props[s] = { rich_text: rt_(slots[s]) }; });
@@ -568,6 +568,11 @@ function text_(p) {
   if (!p) return '';
   const arr = p.rich_text || p.title || [];
   return arr.map(t => t.plain_text).join('');
+}
+
+// 旧名「空」や未設定は「生成待ち」として扱う
+function normStatus_(s) {
+  return !s || s === '空' ? '生成待ち' : s;
 }
 
 function sel_(p) {

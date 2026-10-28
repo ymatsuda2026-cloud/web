@@ -62,7 +62,7 @@ main{padding:20px 24px 48px}
 .board-wrap{overflow-x:auto}
 .board{display:grid;grid-template-columns:repeat(4,minmax(250px,1fr));gap:14px;min-width:1040px}
 .col{border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:200px}
-.col[data-k="空"]{background:var(--col-empty)}.col[data-k="生成済"]{background:var(--col-gen)}.col[data-k="候補"]{background:var(--col-cand)}.col[data-k="採用"]{background:var(--col-adopt)}
+.col[data-k="生成待ち"]{background:var(--col-empty)}.col[data-k="生成済"]{background:var(--col-gen)}.col[data-k="候補"]{background:var(--col-cand)}.col[data-k="採用"]{background:var(--col-adopt)}
 .col-h{display:flex;justify-content:space-between;align-items:baseline;padding:2px 4px}
 .col-h h2{font-size:14px;margin:0}
 .card{background:var(--surface);border:1px solid var(--hair);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
@@ -128,7 +128,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <label class="small muted" for="acc-filter">アカウント</label>
     <select id="acc-filter"><option value="">すべて</option></select>
     <button class="btn" id="btn-reload" type="button">再読み込み</button>
-    <button class="btn" id="btn-sync" type="button" title="抽出ポスト①の「アカウント」指定から、生成ポスト①に「空」を作ります">抽出ポスト①から取り込む</button>
+    <button class="btn" id="btn-sync" type="button" title="抽出ポスト①の「アカウント」指定から、生成ポスト①に「生成待ち」を作ります">抽出ポスト①から取り込む</button>
     <button class="btn primary" id="btn-add" type="button">＋ ネタを追加</button>
   </div>
 </header>
@@ -146,7 +146,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <div class="main">
         <div class="panel">
           <div class="row"><h2 id="ed-title" class="grow"></h2><span class="badge st" id="ed-status"></span><a id="ed-notion" target="_blank" rel="noopener" class="small">Notionで開く</a></div>
-          <div id="ed-empty" class="muted" hidden>まだ生成されていません。claude.ai側で生成すると、ここに3パターンが表示されます。</div>
+          <div id="ed-empty" class="muted" hidden>まだ生成されていません。claude.aiで生成すると、ここに3パターンが表示されます。　<a id="ed-gen-link" class="btn sm primary" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" rel="noopener">claude.aiで生成</a></div>
           <div id="ed-patterns" class="pat"></div>
           <div class="tabs" id="ed-tabs" role="group" aria-label="編集のもとにするパターン"></div>
           <div class="row"><label for="ed-p1" class="grow"><b>1ポスト目</b>（フック・問題提起）</label><span class="cnt" id="ed-c1"></span></div>
@@ -205,11 +205,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
           <h2>接続（この端末に保存）</h2>
           <label class="f">GAS WebアプリのURL<input type="url" id="st-url" placeholder="https://script.google.com/macros/s/…/exec"></label>
           <label class="f">認証キー（GASのAPP_KEY）<input type="password" id="st-key" autocomplete="off"></label>
+          <label class="f">claude.aiの生成画面のURL（空欄なら既定）<input type="url" id="st-gen" placeholder="https://claude.ai/artifact/…"></label>
           <div class="row"><button class="btn" id="st-conn-save" type="button">保存して接続テスト</button><span class="small muted" id="st-conn-msg"></span></div>
         </div>
         <div class="panel">
           <h2>生成指示テンプレート</h2>
-          <p class="small muted" style="margin:0">「空」を生成するときにclaude.ai側で使われます。最後の行「ここにNotionから抽出したポストやメモを貼り付け」が、元ネタの本文抜粋とメモに置き換わります。</p>
+          <p class="small muted" style="margin:0">「生成待ち」を生成するときにclaude.ai側で使われます。最後の行「ここにNotionから抽出したポストやメモを貼り付け」が、元ネタの本文抜粋とメモに置き換わります。</p>
           <textarea id="st-template" rows="18" style="font-family:ui-monospace,monospace;font-size:13px"></textarea>
           <label class="f">再生成のときに常に付ける指示<textarea id="st-regen" rows="2"></textarea></label>
         </div>
@@ -290,7 +291,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 'use strict';
 const SLOTS = ['P1-1','P1-2','P2-1','P2-2','P3-1','P3-2'];
 const COLS = [
-  { k:'空', desc:'claude.aiで生成待ち' },
+  { k:'生成待ち', desc:'claude.aiで生成します', link:true },
   { k:'生成済', desc:'AIの案が入った状態（再生成依頼中を含む）', also:['再生成'] },
   { k:'候補', desc:'編集して採用を判断' },
   { k:'採用', desc:'送信データ作成済み' }
@@ -302,6 +303,11 @@ const FALLBACK = {
   accounts:[]
 };
 
+const DEFAULT_GENERATOR_URL = 'https://claude.ai/artifact/4JJoVVoHN4HtuFF314p25f';
+function generatorUrl(id){
+  const base = (store.get('genUrl') || DEFAULT_GENERATOR_URL).replace(/#.*$/, '');
+  return id ? base + '#' + String(id).replace(/-/g, '') : base;
+}
 const $ = (s, el=document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store = {
@@ -414,7 +420,7 @@ function renderBoard(){
     const keys = [col.k].concat(col.also || []);
     const items = state.posts.filter(p => keys.indexOf(p.status) >= 0);
     return `<section class="col" data-k="${col.k}" aria-label="${col.k}">
-      <div class="col-h"><h2>${col.k}</h2><span class="small muted">${items.length}</span></div>
+      <div class="col-h"><h2>${col.link ? `<a href="${esc(generatorUrl())}" target="_blank" rel="noopener" title="claude.aiの生成画面を開く">${col.k}</a>` : col.k}</h2><span class="small muted">${items.length}</span></div>
       <div class="small muted" style="padding:0 4px">${col.desc}</div>
       ${items.length ? items.map(cardHtml).join('') : '<div class="empty">ありません</div>'}
     </section>`;
@@ -432,9 +438,9 @@ function cardHtml(p){
   const b = (act, label, cls='') => `<button class="btn sm ${cls}" type="button" data-act="${act}" data-id="${p.id}">${label}</button>`;
   let acts = [];
   switch (p.status){
-    case '空': acts = [b('open','開く'), b('delete','削除','danger')]; break;
+    case '生成待ち': acts = [`<a class="btn sm primary" style="display:inline-flex;align-items:center;text-decoration:none" href="${esc(generatorUrl(p.id))}" target="_blank" rel="noopener">claude.aiで生成</a>`, b('open','開く'), b('delete','削除','danger')]; break;
     case '生成済': acts = [b('toCand','候補にする','primary'), b('open','開く'), b('regen','再生成依頼'), b('delete','削除','danger')]; break;
-    case '再生成': acts = [b('regen','指示を変更'), b('cancelRegen','依頼を取り消す'), b('delete','削除','danger')]; break;
+    case '再生成': acts = [`<a class="btn sm warn" style="display:inline-flex;align-items:center;text-decoration:none" href="${esc(generatorUrl(p.id))}" target="_blank" rel="noopener">claude.aiで再生成</a>`, b('regen','指示を変更'), b('cancelRegen','依頼を取り消す'), b('delete','削除','danger')]; break;
     case '候補': acts = [b('open','編集して採用','dark'), b('regen','再生成依頼'), b('toGen','生成済へ戻す'), b('delete','削除','danger')]; break;
     case '採用': acts = [b('open','送信データを見る'), b('toCand','候補へ戻す')]; break;
   }
@@ -536,7 +542,7 @@ $('#src-list').addEventListener('click', e => {
       await api('createPost', { sourceId: btn.dataset.src, account, force: true });
     }
     btn.textContent = '追加済み';
-    toast('「空」として追加しました');
+    toast('「生成待ち」として追加しました');
     await loadPosts();
   });
 });
@@ -576,6 +582,8 @@ async function openEdit(id){
   $('#ed-notion').href = p.url;
   const generated = SLOTS.some(s => p.slots[s]);
   $('#ed-empty').hidden = generated;
+  $('#ed-gen-link').href = generatorUrl(p.id);
+  $('#ed-gen-link').hidden = ['生成待ち','再生成'].indexOf(p.status) < 0;
   $('#ed-patterns').innerHTML = generated ? [1,2,3].map(n => `<div class="box">
       <b class="small">${esc(patName(n))}</b>
       <span class="small muted">1ポスト目　${zen(p.slots[`P${n}-1`])}字</span><p>${esc(p.slots[`P${n}-1`])}</p>
@@ -670,7 +678,7 @@ $('#ed-copy2').addEventListener('click', () => copy(state.post.post2));
 /* ---------- 設定 ---------- */
 function renderSettings(){
   const s = state.settings;
-  $('#st-url').value = store.get('url'); $('#st-key').value = store.get('key');
+  $('#st-url').value = store.get('url'); $('#st-key').value = store.get('key'); $('#st-gen').value = store.get('genUrl');
   $('#st-template').value = s.template || '';
   $('#st-regen').value = s.regenAlways || '';
   $('#st-p1min').value = s.ranges.p1.min; $('#st-p1max').value = s.ranges.p1.max;
@@ -719,7 +727,7 @@ $('#st-accounts').addEventListener('click', e => {
 });
 
 $('#st-conn-save').addEventListener('click', () => run(async () => {
-  store.set('url', $('#st-url').value.trim()); store.set('key', $('#st-key').value.trim());
+  store.set('url', $('#st-url').value.trim()); store.set('key', $('#st-key').value.trim()); store.set('genUrl', $('#st-gen').value.trim());
   $('#st-conn-msg').textContent = '接続を確認しています…';
   try {
     await api('ping');
@@ -777,7 +785,7 @@ window.addEventListener('hashchange', route);
 $('#btn-reload').addEventListener('click', route);
 $('#btn-sync').addEventListener('click', () => run(async () => {
   const r = await api('syncSources');
-  let msg = r.created ? `${r.created}件を「空」として取り込みました` : '新しく取り込むネタはありませんでした';
+  let msg = r.created ? `${r.created}件を「生成待ち」として取り込みました` : '新しく取り込むネタはありませんでした';
   if (r.unknownAccounts.length) msg += `。設定にないアカウントは取り込んでいません：${r.unknownAccounts.join('・')}`;
   if (r.remaining) msg += `。残り${r.remaining}件はもう一度押すと取り込みます`;
   toast(msg, r.unknownAccounts.length > 0);
