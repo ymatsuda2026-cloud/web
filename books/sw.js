@@ -1,5 +1,5 @@
 // 書庫のサービスワーカー：画面一式と、GitHub から取った暗号化済みのデータを端末に置く
-const SHELL = "shoko-shell-v1", DATA = "shoko-data", FONTS = "shoko-fonts";
+const SHELL = "shoko-shell-v2", DATA = "shoko-data", FONTS = "shoko-fonts";
 const SHELL_FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -15,7 +15,19 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // GitHub の本文・目録（.age は暗号化されたまま保存。トークンは保存しない）
+  // 本文・要約・表紙はめったに変わらないので、保存分をすぐ返し、裏で新しいものに入れ替える（開くのを速く）
+  if (url.host === "api.github.com" && /\/contents\/(books\/[^/]+\/bundle\.json\.age|summaries\/[^/]+\.json\.age|thumbs\/[^/]+\.jpg\.age)$/.test(url.pathname)) {
+    e.respondWith((async () => {
+      const c = await caches.open(DATA);
+      const hit = await c.match(req.url);
+      const fresh = fetch(req).then(async res => { if (res.ok) await c.put(req.url, res.clone()); return res; });
+      if (hit) { e.waitUntil(fresh.catch(() => {})); return hit; }
+      return fresh;
+    })());
+    return;
+  }
+
+  // GitHub の目録など（.age は暗号化されたまま保存。トークンは保存しない）
   if (url.host === "api.github.com" && url.pathname.includes("/contents/") && url.pathname.endsWith(".age")) {
     e.respondWith((async () => {
       const c = await caches.open(DATA);
