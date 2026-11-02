@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src data: 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
@@ -24,7 +24,6 @@
   --sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
   --serif:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
   color-scheme:light; box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme:dark){
   :root{
@@ -36,8 +35,11 @@
 }
 *,*::before,*::after{box-sizing:inherit}
 [hidden]{display:none !important}
-html{height:100%}
-body{margin:0; height:100%; background:var(--paper); color:var(--ink); font:15px/1.6 var(--sans); display:flex; flex-direction:column}
+/* スマホで触っても画面全体が動かないよう固定する（拡大・ずれ・引っぱりの跳ね返りを止める） */
+html{height:100%; overflow:hidden; overscroll-behavior:none; touch-action:manipulation; -webkit-text-size-adjust:100%}
+body{position:fixed; inset:0; overflow:hidden; overscroll-behavior:none; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  margin:0; height:auto; background:var(--paper); color:var(--ink); font:15px/1.6 var(--sans); display:flex; flex-direction:column}
 body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--cloth)}
 button,input,textarea{font:inherit; color:inherit}
 button{cursor:pointer}
@@ -93,7 +95,8 @@ button{cursor:pointer}
 .seg{display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden}
 .seg button{border:0; background:var(--sheet); min-height:32px; padding:0 12px; font-size:13px; color:var(--muted)}
 .seg button.on{background:var(--cloth); color:var(--cloth-ink)}
-.stage{flex:1; min-height:0; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; touch-action:pan-y}
+.stage{flex:1; min-height:0; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; touch-action:none; overscroll-behavior:none}
+#shelf,#manage,#night,.gate{overscroll-behavior:contain; -webkit-overflow-scrolling:touch}
 .stage>.empty{max-width:30em}
 .spread{display:flex; position:relative;
   --gut:rgba(60,40,10,.13)}
@@ -125,6 +128,10 @@ button{cursor:pointer}
 .chnav{display:flex; flex-wrap:wrap; gap:10px; margin-block-start:2.4em; font-family:var(--sans); font-size:13px; break-inside:avoid}
 .chnav button{border:1px solid var(--bunko-rule); background:transparent; color:var(--bunko-ink); border-radius:6px; padding:8px 14px; writing-mode:horizontal-tb}
 .chnav button:hover{border-color:var(--foil)}
+/* 選択：見開きをまたいでも1つの選択として扱う（左右のページに同じ色で表示） */
+.runhead,.nombre,.pg,.turn{-webkit-user-select:none; user-select:none}
+.flow ::selection{background:rgba(66,133,244,.30); color:inherit}
+::highlight(xsel){background-color:rgba(66,133,244,.30); color:inherit}
 .turn{position:absolute; top:0; bottom:0; width:11%; min-width:44px; border:0; background:transparent; z-index:3; color:var(--muted); font-size:28px; opacity:0; transition:opacity .2s}
 .turn:hover,.turn:focus-visible{opacity:.7}
 .turn.l{left:0} .turn.r{right:0}
@@ -155,7 +162,10 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
   .tabbar button{flex:1; border:0; background:none; padding:11px 0; font-size:13px; color:var(--muted)}
   .tabbar button.on{color:var(--ink); box-shadow:inset 0 2px 0 var(--foil)}
   .bar .hb .lbl, .rtools .lbl{display:none}
-  .search{max-width:none}
+  .search{max-width:none; min-width:0; font-size:16px; padding:5px 9px}
+  .bar{gap:6px; padding:8px 10px}
+  .brand{white-space:nowrap; font-size:18px}
+  .hb{white-space:nowrap; padding:0 8px; flex:none}
   .rtools{gap:4px; padding:6px 8px}
   .seg button{padding:0 8px; font-size:12px}
   .tb{padding:0 7px; min-width:32px; font-size:12px}
@@ -611,6 +621,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       if (!S.ch) throw new Error("この章が見つかりません。");
       $("#rtools").hidden = false; $("#pbar").hidden = false;
       ls.set(LAST, { bid, no });
+      S.anchor = null;
       layout(atEnd ? { last:true } : { page:0 });
       updateBmGo();
       if (then) then();
@@ -620,9 +631,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     }
   }
 
-  function chapterHTML() {
-    const ch = S.ch, book = S.catalog[S.cur.bid];
-    const chs = book.chapters || [], i = chs.findIndex(c => c.no === ch.no);
+  function chapterHTML(ch = S.ch) {
     let lastPg = null, html = "";
     for (const b of ch.blocks) {
       if (b.label.startsWith("p.") && b.label !== lastPg) { html += `<div class="pg">${esc(b.label)}</div>`; lastPg = b.label; }
@@ -666,11 +675,12 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       <button class="turn r" data-turn="r" aria-label="${S.vert ? "前のページ" : "次のページ"}">›</button>`;
     L = { ...g, n, flows:[...stage().querySelectorAll(".flow")], sheets:[...stage().querySelectorAll(".sheet")], bmPage:null };
     L.pages = countPages();
+    notePages();
     let p = 0;
-    if (target?.block) p = pageOfBlock(target.block) ?? 0;
+    if (target?.block) p = pageOfPoint(target.block, target.off) ?? 0;
     else if (target?.last) p = L.pages - 1;
     else if (target?.page != null) p = target.page;
-    show(p);
+    show(p, true);
   }
 
   const stepPx = () => S.vert ? L.th + L.cg : L.tw + L.cg;
@@ -692,6 +702,38 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     const r = el?.getClientRects()[0];
     return r ? pageOfRect(r, f.getBoundingClientRect()) : null;
   }
+  /* 段落の途中の文字位置まで覚えて、組み直しても同じページに戻れるようにする
+     （段落がページをまたぐと、段落の頭のページに戻ってしまっていたため） */
+  function textPoint(el, off) {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, o = off;
+    while ((n = w.nextNode())) { if (o < n.length) return [n, o]; o -= n.length; }
+    return null;
+  }
+  function pageAtOff(el, off, base) {
+    const pt = textPoint(el, off); if (!pt) return null;
+    const r = document.createRange();
+    r.setStart(pt[0], pt[1]); r.setEnd(pt[0], Math.min(pt[0].length, pt[1] + 1));
+    const rs = r.getClientRects();
+    return rs.length ? pageOfRect(rs[0], base) : null;
+  }
+  function pageOfPoint(id, off) {
+    if (!off) return pageOfBlock(id);
+    const f = L.flows[0], el = f.querySelector(`[data-id="${CSS.escape(id)}"]`);
+    if (!el) return null;
+    return pageAtOff(el, off, f.getBoundingClientRect()) ?? pageOfBlock(id);
+  }
+  // いま見ているページの先頭の位置（段落ID＋その段落の中の何文字目か）
+  function anchorAt(k = S.page || 0) {
+    const el = blockAtPage(k); if (!el) return null;
+    const base = L.flows[0].getBoundingClientRect(), r0 = el.getClientRects()[0];
+    if (!r0 || pageOfRect(r0, base) >= k) return { block:el.dataset.id, off:0 };
+    let lo = 0, hi = el.textContent.length - 1, ans = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1, pg = pageAtOff(el, mid, base);
+      if (pg == null || pg < k) lo = mid + 1; else { ans = mid; hi = mid - 1; }
+    }
+    return { block:el.dataset.id, off:ans };
+  }
   function blockAtPage(k) {
     const f = L?.flows[0]; if (!f) return null;
     const base = f.getBoundingClientRect();
@@ -702,29 +744,89 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     return null;
   }
 
-  function show(p) {
+  // keep が無い（ページを送った・飛んだ）ときは、覚えていた読み位置を捨てて今のページから取り直す
+  function show(p, keep) {
     if (!L) return;
+    if (!keep) S.anchor = null;
     p = Math.max(0, Math.min(L.pages - 1, p));
     if (L.n === 2) p -= p % 2;
     S.page = p;
-    const step = stepPx();
+    const step = stepPx(), off = bookOffset();
     L.flows.forEach((f, i) => {
       const q = p + i, blank = q >= L.pages, sh = L.sheets[i];
       f.style.transform = S.vert ? `translateY(${-q * step}px)` : `translateX(${-q * step}px)`;
       f.style.visibility = blank ? "hidden" : "";
-      sh.querySelector(".nombre").textContent = blank ? "" : String(q + 1);
+      sh.querySelector(".nombre").textContent = blank ? "" : String((off ?? 0) + q + 1);
       sh.querySelector(".runhead").style.visibility = blank ? "hidden" : "";
       sh.querySelector(".ribbon")?.remove();
     });
     const bm = S.bms[S.cur.bid];
     if (bm && bm.no === S.ch.no) {
-      if (L.bmPage == null) L.bmPage = pageOfBlock(bm.block);
+      if (L.bmPage == null) L.bmPage = pageOfPoint(bm.block, bm.off);
       const i = L.bmPage - p;
       if (i >= 0 && i < L.n) L.sheets[i].insertAdjacentHTML("beforeend", '<div class="ribbon" aria-hidden="true"></div>');
     }
-    const last = Math.min(L.pages, p + L.n);
-    $("#pgInfo").textContent = last > p + 1 ? `${p + 1}–${last} / ${L.pages}` : `${p + 1} / ${L.pages}`;
-    $("#pbarFill").style.width = (last / L.pages * 100).toFixed(1) + "%";
+    const last = Math.min(L.pages, p + L.n), total = bookTotal();
+    const o = total != null && off != null ? off : 0, all = total != null && off != null ? total : L.pages;
+    $("#pgInfo").textContent = last > p + 1 ? `${o + p + 1}–${o + last} / ${all}` : `${o + p + 1} / ${all}`;
+    $("#pbarFill").style.width = ((o + last) / all * 100).toFixed(1) + "%";
+  }
+
+  /* ---------- 本全体の通しページ番号 ----------
+     ページ数は画面の大きさ・文字の大きさ・縦横で変わるので、その組み合わせごとに
+     各章を見えない所で組んで数え、前の章までのページ数を足して通し番号にする */
+  const PM = { key:null, counts:new Map(), tok:0 };
+  const pmKey = () => L && S.cur ? [S.cur.bid, L.pw, L.ph, S.fs, S.vert ? 1 : 0].join("|") : null;
+  function notePages() {
+    const k = pmKey();
+    if (PM.key !== k) { PM.key = k; PM.counts = new Map(); }
+    PM.counts.set(S.ch.no, L.pages);
+    measureBook();
+  }
+  function chaptersOf() { return S.catalog[S.cur.bid]?.chapters || []; }
+  function bookOffset() {
+    if (!L || PM.key !== pmKey()) return null;
+    let o = 0;
+    for (const c of chaptersOf()) { if (c.no === S.ch.no) return o; const n = PM.counts.get(c.no); if (n == null) return null; o += n; }
+    return null;
+  }
+  function bookTotal() {
+    if (!L || PM.key !== pmKey()) return null;
+    let t = 0;
+    for (const c of chaptersOf()) { const n = PM.counts.get(c.no); if (n == null) return null; t += n; }
+    return t;
+  }
+  function countIn(f, step) {
+    const base = f.getBoundingClientRect(); let max = 0;
+    for (const el of f.children) {
+      const rs = el.getClientRects(); if (!rs.length) continue;
+      const r = rs[rs.length - 1], d = S.vert ? r.top - base.top : r.left - base.left;
+      max = Math.max(max, Math.floor((d + 2) / step));
+    }
+    return max + 1;
+  }
+  async function measureBook() {
+    const tok = ++PM.tok, key = PM.key, bundle = S.bundles.get(S.cur.bid);
+    if (!bundle) return;
+    const todo = chaptersOf().filter(c => !PM.counts.has(c.no));
+    if (!todo.length) return;
+    const box = document.createElement("div");
+    box.className = "spread"; box.setAttribute("aria-hidden", "true");
+    box.style.cssText = stage().querySelector(".spread").getAttribute("style") + ";position:absolute;left:-200000px;top:0;visibility:hidden;pointer-events:none";
+    box.innerHTML = '<div class="sheet"><div class="vp"><div class="flow"></div></div></div>';
+    stage().appendChild(box);
+    const f = box.querySelector(".flow"), step = stepPx();
+    try {
+      for (const c of todo) {
+        await new Promise(r => setTimeout(r, 0));              // 画面の操作を止めないよう1章ずつ
+        if (tok !== PM.tok || key !== pmKey() || !box.isConnected) return;
+        const ch = bundle.chapters.find(x => x.no === c.no);
+        if (!ch) { PM.counts.set(c.no, 0); continue; }
+        f.innerHTML = chapterHTML(ch);
+        PM.counts.set(c.no, countIn(f, step));
+      }
+    } finally { box.remove(); }
+    if (tok === PM.tok && key === pmKey() && L) show(S.page, true);
   }
 
   function next() {
@@ -741,6 +843,47 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     openChapter(S.cur.bid, t.no, false, null, dir < 0);
   }
   const turn = side => (side === "l") === S.vert ? next() : prev();   // 縦書きは左へ進む
+
+  /* ---------- 見開きをまたぐ選択 ----------
+     左右のページは同じ本文を2つ並べて、ずらして見せている。そのため、ページをまたいで選ぶと
+     別々の本文にまたがってしまい、見えない部分まで選ばれる。
+     → 選択は書き始めたページの本文の中だけに直し、もう一方のページには同じ範囲を色付けして見せる */
+  const pathOf = (node, root) => { const p = []; while (node && node !== root) { const par = node.parentNode; if (!par) return null; p.push(Array.prototype.indexOf.call(par.childNodes, node)); node = par; } return node === root ? p.reverse() : null; };
+  const nodeAt = (root, p) => { let n = root; for (const i of p) { n = n?.childNodes[i]; if (!n) return null; } return n; };
+  const flowOf = n => (n?.nodeType === 1 ? n : n?.parentElement)?.closest?.(".flow") || null;
+  const HL = "CSS" in window && CSS.highlights && typeof Highlight === "function";
+  function mirror(range, from, to) {
+    const a = pathOf(range.startContainer, from), b = pathOf(range.endContainer, from);
+    if (!a || !b) return null;
+    const sn = nodeAt(to, a), en = nodeAt(to, b);
+    if (!sn || !en) return null;
+    const r = document.createRange();
+    try { r.setStart(sn, range.startOffset); r.setEnd(en, range.endOffset); } catch { return null; }
+    return r;
+  }
+  let fixing = false;
+  document.addEventListener("selectionchange", () => {
+    if (fixing) return;
+    const sel = getSelection();
+    if (!L || !sel.rangeCount || sel.isCollapsed) { if (HL) CSS.highlights.delete("xsel"); return; }
+    const fa = flowOf(sel.anchorNode), ff = flowOf(sel.focusNode);
+    if (!fa || !L.flows.includes(fa)) { if (HL) CSS.highlights.delete("xsel"); return; }
+    // 終わりが別のページの本文にある → 書き始めたページの本文の同じ場所に置き換える
+    if (ff && ff !== fa && L.flows.includes(ff)) {
+      const p = pathOf(sel.focusNode, ff), n = p && nodeAt(fa, p);
+      if (n) {
+        fixing = true;
+        try { sel.setBaseAndExtent(sel.anchorNode, sel.anchorOffset, n, Math.min(sel.focusOffset, n.nodeType === 3 ? n.length : n.childNodes.length)); } catch {}
+        fixing = false;
+      }
+    } else if (!ff || !fa.contains(sel.focusNode)) {
+      return;      // 本文の外（余白など）にいる間はそのまま
+    }
+    if (!HL) return;
+    const r = sel.getRangeAt(0), others = [];
+    for (const f of L.flows) if (f !== fa) { const m = mirror(r, fa, f); if (m) others.push(m); }
+    if (others.length) CSS.highlights.set("xsel", new Highlight(...others)); else CSS.highlights.delete("xsel");
+  });
 
   stage().addEventListener("click", e => {
     const g = e.target.closest("[data-go]");
@@ -763,6 +906,10 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     if (Math.abs(d) < 8 || Date.now() - wheelAt < 380) return;
     wheelAt = Date.now(); d > 0 ? next() : prev();
   }, { passive:false });
+  // iOS Safari はピンチでの拡大を viewport の指定だけでは止めないため、ここでも止める
+  ["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive:false }));
+  // 本文の上で指を動かしても、画面が動かないようにする（めくりは指を離したときに判定）
+  stage().addEventListener("touchmove", e => { if (e.cancelable && getSelection().isCollapsed) e.preventDefault(); }, { passive:false });
   let sx = null, sy = 0;
   stage().addEventListener("pointerdown", e => { if (e.pointerType !== "mouse") { sx = e.clientX; sy = e.clientY; } });
   stage().addEventListener("pointerup", e => {
@@ -772,9 +919,9 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     (dx > 0) === S.vert ? next() : prev();       // 縦書きは右へめくると次へ
   });
 
-  function jump(id, quiet) {
+  function jump(id, quiet, off) {
     if (!L) return;
-    const p = pageOfBlock(id); if (p == null) return;
+    const p = pageOfPoint(id, off); if (p == null) return;
     show(p);
     if (quiet) return;
     const els = stage().querySelectorAll(`[data-id="${CSS.escape(id)}"]`);
@@ -782,14 +929,18 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     setTimeout(() => els.forEach(el => el.classList.remove("hit")), 2400);
   }
   const firstVisible = () => blockAtPage(S.page || 0);
-  function relayout() {
+  // force が無ければ、ページの大きさが変わっていないときは組み直さない
+  function relayout(force) {
     if (!L || !S.ch) return;
-    const a = firstVisible()?.dataset.id;
-    layout(a ? { block:a } : { page:0 });
+    if (force !== true) { const g = geometry(); if (g.pw === L.pw && g.ph === L.ph && g.spread === (L.n === 2)) return; }
+    layout(S.anchor || (S.anchor = anchorAt()) || { page:0 });
   }
   let rzT = 0;
   new ResizeObserver(() => { clearTimeout(rzT); rzT = setTimeout(relayout, 120); }).observe(stage());
-  document.fonts?.ready.then(relayout);
+  document.fonts?.ready.then(() => relayout(true));
+  // 文字の形（Webフォント）が後から届いたときも、今のページのまま組み直す
+  let fontT = 0;
+  document.fonts?.addEventListener?.("loadingdone", () => { clearTimeout(fontT); fontT = setTimeout(() => relayout(true), 300); });
 
   /* ---------- 組み方・文字・全画面・しおり ---------- */
   function applyMode() {
@@ -798,12 +949,12 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
   }
   document.querySelectorAll("[data-wm]").forEach(b => b.onclick = () => {
     const v = b.dataset.wm === "v"; if (v === S.vert) return;
-    const a = firstVisible()?.dataset.id;
+    const a = L ? (S.anchor || (S.anchor = anchorAt())) : null;
     S.vert = v; savePrefs(); applyMode();
-    if (S.ch) layout(a ? { block:a } : { page:0 });
+    if (S.ch) layout(a || { page:0 });
   });
   const setFs = d => {
-    S.fs = Math.min(24, Math.max(13, S.fs + d)); savePrefs(); relayout();
+    S.fs = Math.min(24, Math.max(13, S.fs + d)); savePrefs(); relayout(true);
   };
   $("#fsDown").onclick = () => setFs(-1);
   $("#fsUp").onclick = () => setFs(1);
@@ -817,15 +968,15 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 
   function updateBmGo() { $("#bmGo").hidden = !S.bms[S.cur?.bid]; }
   $("#bmHere").onclick = () => {
-    const el = firstVisible(); if (!el || !S.cur) return;
-    S.bms[S.cur.bid] = { no:S.cur.no, block:el.dataset.id, at:Date.now() };
+    const a = L && anchorAt(); if (!a || !S.cur) return;
+    S.bms[S.cur.bid] = { no:S.cur.no, block:a.block, off:a.off, at:Date.now() };
     ls.set(BMS, S.bms); updateBmGo(); renderShelf();
-    if (L) { L.bmPage = null; show(S.page); }
+    if (L) { L.bmPage = null; show(S.page, true); }
     status("しおりを挟みました（この端末に保存）。"); setTimeout(() => status(""), 2500);
   };
   $("#bmGo").onclick = () => {
     const bm = S.bms[S.cur?.bid]; if (!bm) return;
-    if (bm.no === S.cur.no) jump(bm.block); else openChapter(S.cur.bid, bm.no, false, () => jump(bm.block));
+    if (bm.no === S.cur.no) jump(bm.block, false, bm.off); else openChapter(S.cur.bid, bm.no, false, () => jump(bm.block, false, bm.off));
   };
 
   /* ---------- 変換管理（未変換・変換待ち・変換済み） ---------- */
