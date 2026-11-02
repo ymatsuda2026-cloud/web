@@ -162,6 +162,34 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
   .turn{opacity:0 !important}
 }
 @media (prefers-reduced-motion:reduce){.blk{transition:none}}
+
+/* 変換管理 */
+.hb[aria-pressed="true"]{background:var(--foil); border-color:var(--foil); color:#fff}
+#manage{flex:1; min-height:0; overflow:auto; padding:0 0 40px}
+.mtools{position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 16px; background:var(--paper); border-bottom:1px solid var(--line)}
+.mtools .sp{flex:1}
+.mtools input[type=search]{min-width:200px; border:1px solid var(--line); background:var(--sheet); border-radius:6px; padding:6px 10px; font-size:13.5px}
+.seg button .n{margin-left:5px; font-size:11.5px; opacity:.8; font-variant-numeric:tabular-nums}
+.tb.main{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth)}
+.tb[disabled]{opacity:.45; cursor:default}
+.mnote{margin:10px 16px 4px; font-size:13px; color:var(--muted); line-height:1.7}
+.mlist{padding:0 16px}
+.mrow{display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:4px 10px; align-items:center; padding:9px 4px; border-bottom:1px solid var(--line); cursor:pointer}
+.mrow:hover{background:var(--foil-soft)}
+.mrow input{width:17px; height:17px; accent-color:var(--cloth); margin:0}
+.mrow input[disabled]{opacity:.3}
+.mt{font-family:var(--serif); font-weight:600; font-size:14.5px; line-height:1.45}
+.mm{font-size:12px; color:var(--muted)}
+.mst{font-size:11.5px; border-radius:10px; padding:1px 9px; white-space:nowrap}
+.mst.todo{background:var(--line); color:var(--muted)}
+.mst.queue{background:var(--foil-soft); color:var(--foil-text); border:1px solid var(--foil)}
+.mst.done{background:var(--cloth); color:var(--cloth-ink)}
+.mmore{display:block; margin:14px auto; border:1px solid var(--line); background:var(--sheet); border-radius:6px; padding:7px 16px; font-size:13px}
+@media (max-width:820px){
+  .mtools input[type=search]{flex:1 1 100%; min-width:0; order:1}
+  .mtools .sp{display:none}
+  .mtools .tb{order:2; flex:1}
+}
 </style>
 </head>
 <body>
@@ -200,6 +228,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 <header class="bar" id="bar" hidden>
   <div class="brand">書庫</div>
   <input class="search" id="q" type="search" placeholder="書名・著者で探す" aria-label="書名・著者で探す">
+  <button class="hb" id="manageBtn" aria-pressed="false" title="NAS の本の変換を管理する">変換<span class="lbl">管理</span></button>
   <button class="hb" id="reload" title="GitHub から読み直す">↻<span class="lbl"> 更新</span></button>
   <button class="hb" id="lock" title="鍵をかける">🔒<span class="lbl"> 鍵</span></button>
 </header>
@@ -223,6 +252,22 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     <div class="pbar" id="pbar" hidden><i id="pbarFill"></i></div>
   </article>
 </main>
+<section id="manage" hidden aria-label="変換管理">
+  <div class="mtools">
+    <div class="seg" id="mfilter" role="group" aria-label="状態で絞り込む">
+      <button data-f="all">すべて<span class="n"></span></button>
+      <button data-f="todo">未変換<span class="n"></span></button>
+      <button data-f="queue">変換待ち<span class="n"></span></button>
+      <button data-f="done">変換済み<span class="n"></span></button>
+    </div>
+    <input type="search" id="mq" placeholder="書名・著者で探す" aria-label="書名・著者で探す">
+    <span class="sp"></span>
+    <button class="tb main" id="mAdd" disabled>変換待ちにする</button>
+    <button class="tb" id="mDel" disabled>変換待ちから外す</button>
+  </div>
+  <p class="mnote" id="mnote"></p>
+  <div class="mlist" id="mlist"></div>
+</section>
 <nav class="tabbar" id="tabbar" hidden>
   <button data-m="shelf" class="on">本棚</button>
   <button data-m="reader">本文</button>
@@ -352,7 +397,8 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
   /* ---------- 鍵の画面 ---------- */
   function showGate() {
     const has = !!ls.get(VAULT, null);
-    $("#gate").hidden = false; $("#bar").hidden = $("#app").hidden = $("#tabbar").hidden = true; status("");
+    $("#gate").hidden = false; $("#bar").hidden = $("#app").hidden = $("#tabbar").hidden = $("#manage").hidden = true; status("");
+    S.inv = null; S.queue = null; S.qsha = null; S.managing = false; $("#manageBtn").setAttribute("aria-pressed", "false");
     document.body.classList.remove("full");
     $("#setupForm").hidden = has; $("#unlockForm").hidden = !has;
     $("#gateLead").textContent = has ? "合言葉を入れて本棚を開きます。" : "この端末で初めて開くための設定です。";
@@ -410,6 +456,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     applyMode();
     if (cat) setCatalog(cat); else await loadCatalog();
     netState();
+    if (location.hash === "#manage") return setManage(true);
     const last = ls.get(LAST, null);
     if (last && S.catalog[last.bid] && !mobile()) openChapter(last.bid, last.no, true);
   }
@@ -419,7 +466,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     try { setCatalog(await getJSON("index.json.age")); status(""); }
     catch (e) { $("#shelf").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
   }
-  $("#reload").onclick = () => { S.bundles.clear(); loadCatalog(); };
+  $("#reload").onclick = async () => { S.bundles.clear(); await loadCatalog(); if (S.managing) loadManage(); };
 
   function setCatalog(cat) {
     S.catalog = cat || {};
@@ -735,6 +782,139 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     const bm = S.bms[S.cur?.bid]; if (!bm) return;
     if (bm.no === S.cur.no) jump(bm.block); else openChapter(S.cur.bid, bm.no, false, () => jump(bm.block));
   };
+
+  /* ---------- 変換管理（未変換・変換待ち・変換済み） ---------- */
+  const M = { f:"all", q:"", sel:new Set(), limit:300 };
+  const ST_LABEL = { todo:"未変換", queue:"変換待ち", done:"変換済み" };
+  const b64big = u => { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
+  const apiHeaders = () => ({ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" });
+
+  function setManage(on) {
+    S.managing = on;
+    if (on && S.full) setFull(false);
+    $("#manage").hidden = !on; $("#app").hidden = on; $("#tabbar").hidden = on;
+    $("#q").hidden = on;
+    $("#manageBtn").setAttribute("aria-pressed", String(on));
+    $("#manageBtn").innerHTML = on ? '本棚へ<span class="lbl">戻る</span>' : '変換<span class="lbl">管理</span>';
+    try { history.replaceState(null, "", on ? "#manage" : location.pathname + location.search); } catch {}
+    if (on) { if (!S.inv) loadManage(); else renderManage(); }
+    else if (L) requestAnimationFrame(relayout);
+  }
+  $("#manageBtn").onclick = () => setManage(!S.managing);
+
+  async function loadQueue() {
+    let r;
+    try { r = await fetch(apiURL("queue.json.age"), { cache:"no-store", headers:apiHeaders() }); }
+    catch { throw new Error(navigator.onLine ? "GitHub につながりませんでした。" : "オフラインのため、変換待ちの一覧を読めません。"); }
+    if (r.status === 404) { S.queue = []; S.qsha = null; return; }
+    if (!r.ok) throw new Error("変換待ちの一覧を読めませんでした（" + r.status + "）。");
+    const j = await r.json();
+    S.qsha = j.sha;
+    const bytes = unb64(String(j.content || "").replace(/\s/g, ""));
+    try { S.queue = JSON.parse(await dec.decrypt(bytes, "text")).items || []; }
+    catch { throw new Error("変換待ちの一覧を復号できませんでした。"); }
+  }
+  async function saveQueue(items) {
+    if (!navigator.onLine) throw new Error("オフラインのため保存できません。通信できる所で操作してください。");
+    const e = new AgeLib.Encrypter();
+    e.addRecipient(await AgeLib.identityToRecipient(secret.key));
+    const ct = await e.encrypt(JSON.stringify({ items, updated:new Date().toISOString() }));
+    const body = { message:`変換待ちを更新（${items.length}冊）`, content:b64big(ct) };
+    if (S.qsha) body.sha = S.qsha;
+    const r = await fetch(apiURL("queue.json.age"), { method:"PUT", headers:{ ...apiHeaders(), "Content-Type":"application/json" }, body:JSON.stringify(body) });
+    if (r.status === 403 || r.status === 404)
+      throw new Error("保存できません。トークンの Contents の権限を「Read and write」にしてください。");
+    if (r.status === 409 || r.status === 422) { await loadQueue(); throw new Error("別の端末で変換待ちが変わっていたので読み直しました。もう一度操作してください。"); }
+    if (!r.ok) throw new Error("保存に失敗しました（" + r.status + "）。");
+    S.qsha = (await r.json()).content?.sha || null;
+    S.queue = items;
+  }
+
+  async function loadManage() {
+    $("#mlist").innerHTML = '<div class="empty">一覧を読み込み中…</div>'; $("#mnote").textContent = "";
+    try {
+      const inv = await getJSON("inventory.json.age").catch(e => {
+        if (/見つかりません|まだありません/.test(e.message)) throw new Error("本の一覧がまだ GitHub にありません。Mac で epub2gh を一度実行すると作られます。");
+        throw e;
+      });
+      const seen = new Set();
+      S.inv = (inv.books || []).filter(b => b.bid && !seen.has(b.bid) && seen.add(b.bid));
+      await loadQueue();
+      M.sel.clear();
+      renderManage();
+    } catch (e) { $("#mlist").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  }
+
+  const stOf = (bid, qset) => S.catalog[bid] ? "done" : qset.has(bid) ? "queue" : "todo";
+  function renderManage() {
+    if (!S.inv) return;
+    const qpos = new Map(S.queue.map((x, i) => [x.bid, i]));
+    const qset = new Set(qpos.keys());
+    const cnt = { all:S.inv.length, todo:0, queue:0, done:0 };
+    for (const b of S.inv) cnt[stOf(b.bid, qset)]++;
+    document.querySelectorAll("#mfilter button").forEach(b => {
+      b.classList.toggle("on", b.dataset.f === M.f);
+      b.querySelector(".n").textContent = cnt[b.dataset.f];
+    });
+    $("#mnote").textContent = cnt.queue
+      ? `変換待ちは ${cnt.queue} 冊です。Mac は毎日23時に、上から順に1日20冊まで変換します（今のままなら約${Math.ceil(cnt.queue / 20)}日で終わります）。`
+      : "未変換の本を選んで「変換待ちにする」を押すと、Mac が毎日23時に変換します。";
+    const q = M.q.toLowerCase();
+    const rank = b => { const st = stOf(b.bid, qset); return st === "queue" ? qpos.get(b.bid) : st === "todo" ? 1e6 : 2e6; };
+    const list = S.inv
+      .filter(b => M.f === "all" || stOf(b.bid, qset) === M.f)
+      .filter(b => !q || (b.title + " " + (b.authors || []).join(" ")).toLowerCase().includes(q))
+      .sort((a, b) => rank(a) - rank(b) || String(b.added || "").localeCompare(String(a.added || "")) || String(a.title).localeCompare(String(b.title), "ja"));
+    if (!list.length) { $("#mlist").innerHTML = '<div class="empty">該当する本はありません。</div>'; updateMButtons(qset); return; }
+    const shown = list.slice(0, M.limit);
+    $("#mlist").innerHTML = shown.map(b => {
+      const st = stOf(b.bid, qset), on = M.sel.has(b.bid);
+      const label = st === "queue" ? `変換待ち ${qpos.get(b.bid) + 1}番目` : ST_LABEL[st];
+      return `<label class="mrow">
+        <input type="checkbox" data-mb="${esc(b.bid)}"${on ? " checked" : ""}${st === "done" ? " disabled" : ""} aria-label="${esc(b.title)}を選ぶ">
+        <span><span class="mt">${esc(b.title)}</span><br><span class="mm">${esc((b.authors || []).join(" / "))}${(b.authors || []).length ? "　" : ""}${esc(String(b.type || "").toUpperCase())}${b.added ? "・" + esc(b.added) + " 追加" : ""}</span></span>
+        <span class="mst ${st}">${label}</span>
+      </label>`;
+    }).join("") + (list.length > shown.length ? `<button class="mmore" id="mMore">さらに表示（残り ${list.length - shown.length} 冊）</button>` : "");
+    updateMButtons(qset);
+  }
+  function updateMButtons(qset = new Set((S.queue || []).map(x => x.bid))) {
+    const sel = [...M.sel];
+    const nAdd = sel.filter(b => stOf(b, qset) === "todo").length, nDel = sel.filter(b => stOf(b, qset) === "queue").length;
+    $("#mAdd").disabled = !nAdd; $("#mDel").disabled = !nDel;
+    $("#mAdd").textContent = nAdd ? `変換待ちにする（${nAdd}）` : "変換待ちにする";
+    $("#mDel").textContent = nDel ? `変換待ちから外す（${nDel}）` : "変換待ちから外す";
+  }
+  $("#mfilter").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b) { M.f = b.dataset.f; M.limit = 300; renderManage(); } });
+  $("#mq").addEventListener("input", e => { M.q = e.target.value.trim(); M.limit = 300; renderManage(); });
+  $("#mlist").addEventListener("change", e => {
+    const c = e.target.closest("[data-mb]"); if (!c) return;
+    c.checked ? M.sel.add(c.dataset.mb) : M.sel.delete(c.dataset.mb);
+    updateMButtons();
+  });
+  $("#mlist").addEventListener("click", e => { if (e.target.id === "mMore") { M.limit += 300; renderManage(); } });
+  async function changeQueue(add) {
+    const btn = add ? $("#mAdd") : $("#mDel"), keep = btn.textContent;
+    const qset = new Set(S.queue.map(x => x.bid));
+    const byId = new Map(S.inv.map(b => [b.bid, b]));
+    let items;
+    if (add) {
+      const now = new Date().toISOString();
+      const adds = [...M.sel].filter(b => stOf(b, qset) === "todo").map(b => ({ bid:b, title:byId.get(b)?.title || "", added:now }));
+      items = [...S.queue, ...adds];
+    } else items = S.queue.filter(x => !M.sel.has(x.bid));
+    btn.disabled = true; btn.textContent = "保存中…";
+    try {
+      await saveQueue(items);
+      M.sel.clear();
+      status(add ? "変換待ちにしました。Mac の次の実行（23時）で変換されます。" : "変換待ちから外しました。");
+      setTimeout(() => status(""), 3500);
+    } catch (err) { status(err.message); }
+    btn.textContent = keep;
+    renderManage();
+  }
+  $("#mAdd").onclick = () => changeQueue(true);
+  $("#mDel").onclick = () => changeQueue(false);
 
   /* ---------- スマホのタブ ---------- */
   function setMobile(m) {
