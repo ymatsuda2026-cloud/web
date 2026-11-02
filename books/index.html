@@ -594,12 +594,29 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
   }
   const coverHTML = (b, extra = "") => `<span class="mcover" style="--h:${hashHue(b.title)}" data-thumb="${esc(b.id)}">
       <span class="ph" aria-hidden="true"><b>${esc(b.title)}</b><i>${esc(authorsOf(b) || String(b.type || "").toUpperCase())}</i></span>${extra}</span>`;
+  /* ---------- 「part19」のような仮の章名 ----------
+     EPUB の中のファイル名がそのまま章名になったもの。目次には出さず、直前の見出しの続きとして扱う */
+  const GENERIC_CH = /^\s*(?:part|chapter|chap|ch|section|sec|text|page|index|p|c|split|toc|cover|titlepage)[\s._-]*\d+(?:[\s._-]*(?:split)?[\s._-]*\d+)*\s*$/i;
+  const isGenericTitle = t => !String(t || "").trim() || GENERIC_CH.test(String(t));
+  function chapterGroups(b) {
+    const out = [];
+    for (const c of b.chapters || []) {
+      if (isGenericTitle(c.title) && out.length) out[out.length - 1].nos.push(c.no);
+      else out.push({ no:c.no, title:isGenericTitle(c.title) ? "冒頭" : c.title, nos:[c.no], lead:isGenericTitle(c.title) });
+    }
+    return out;
+  }
+  // 章の見出し（仮の章名なら、直前の本当の見出し）
+  function titleFor(b, no) {
+    const g = chapterGroups(b).find(g => g.nos.includes(no));
+    return !g || g.lead ? "" : g.title;
+  }
   function chapterButtons(b) {
-    return (b.chapters || []).map(c => `<button class="ch${S.cur?.bid === b.id && S.cur?.no === c.no ? " on" : ""}" data-bid="${esc(b.id)}" data-no="${c.no}">${esc(c.title)}</button>`).join("");
+    return chapterGroups(b).map(g => `<button class="ch${S.cur?.bid === b.id && g.nos.includes(S.cur?.no) ? " on" : ""}" data-bid="${esc(b.id)}" data-no="${g.no}">${esc(g.title)}</button>`).join("");
   }
   function bookExtras(b) {
     const bm = S.bms[b.id], bmCh = bm && (b.chapters || []).find(c => c.no === bm.no);
-    return (bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む（${esc(bmCh.title)}）</button>` : "")
+    return (bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む${titleFor(b, bmCh.no) ? `（${esc(titleFor(b, bmCh.no))}）` : ""}</button>` : "")
       + ("caches" in window ? `<button class="keep${S.saved.has(b.id) ? " on" : ""}" data-keep="${esc(b.id)}">${S.saved.has(b.id) ? "✓ この端末に保存済み（押すと消す）" : "↓ この端末に保存（オフライン用）"}</button>` : "");
   }
   function renderShelf() {
@@ -634,9 +651,9 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
           <div class="book-title">${esc(b.title)}</div>
           <div class="book-meta">${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc((b.type || "").toUpperCase())}・${(b.chapters || []).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}</div>
         </button>
-        ${bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む（${esc(bmCh.title)}）</button>` : ""}
+        ${bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む${titleFor(b, bmCh.no) ? `（${esc(titleFor(b, bmCh.no))}）` : ""}</button>` : ""}
         ${open && "caches" in window ? `<button class="keep${S.saved.has(b.id) ? " on" : ""}" data-keep="${esc(b.id)}">${S.saved.has(b.id) ? "✓ この端末に保存済み（押すと消す）" : "↓ この端末に保存（オフライン用）"}</button>` : ""}
-        ${open ? (b.chapters || []).map(c => `<button class="ch${S.cur?.bid === b.id && S.cur?.no === c.no ? " on" : ""}" data-bid="${esc(b.id)}" data-no="${c.no}">${esc(c.title)}</button>`).join("") : ""}
+        ${open ? chapterButtons(b) : ""}
       </div>`;
     }).join("");
   }
@@ -719,7 +736,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       const t = (m ? m[1] : b.text).replace(/\*\*|__/g, "");
       html += `<p class="blk${m ? " h" : ""}" data-id="${esc(b.id)}">${esc(t).replace(/\n/g, "<br>")}</p>`;
     }
-    return `<h1 class="ctitle">${esc(ch.title)}</h1>${html}`;
+    return (isGenericTitle(ch.title) ? "" : `<h1 class="ctitle">${esc(ch.title)}</h1>`) + html;
   }
 
   // 置ける場所に合わせて A4 縦（1:√2）のページを決める。2枚並ぶ幅があれば見開き
@@ -747,7 +764,8 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     const html = chapterHTML();
     let sheets = "";
     for (let i = 0; i < n; i++) {
-      const head = n === 1 ? `${book.title}　${ch.title}` : (i === 0 ? book.title : ch.title);
+      const ct = titleFor(book, ch.no);
+      const head = n === 1 ? (ct ? `${book.title}　${ct}` : book.title) : (i === 0 ? book.title : ct);
       sheets += `<div class="sheet s${i}"><div class="runhead">${esc(head)}</div><div class="vp"><div class="flow"${i ? ' aria-hidden="true"' : ""}>${html}</div></div><div class="nombre"></div></div>`;
     }
     stage().innerHTML = `<button class="turn l" data-turn="l" aria-label="${S.vert ? "次のページ" : "前のページ"}">‹</button>
