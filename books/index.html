@@ -264,6 +264,9 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 .kp{border:1px solid var(--bunko-rule); border-radius:4px; padding:.7em .9em; margin-block:0 1.4em; font-family:var(--sans); font-size:.86em; line-height:1.75; break-inside:avoid}
 .kp b{display:block; font-size:.9em; color:var(--bunko-muted); margin-block-end:.3em}
 .kp ol{margin:0; padding-inline-start:1.3em}
+.fig{margin:.9em auto; break-inside:avoid; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03); border-radius:2px}
+.fig img{max-width:100%; max-height:100%; object-fit:contain; opacity:0; transition:opacity .2s}
+.fig img.on{opacity:1}
 .spread.anim .flow{transition:transform .32s cubic-bezier(.2,.7,.2,1)}
 .spread.fadein{animation:shkfade .28s ease}
 @keyframes shkfade{from{opacity:.25}to{opacity:1}}
@@ -607,7 +610,8 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 
   function lock() {
     flushRS();
-    secret = null; S.sums = new Map(); S.meta = null; S.metaTried = false; dec = null; S.bundles.clear(); S.catalog = {}; S.books = []; S.cur = null; S.ch = null;
+    secret = null; S.sums = new Map(); S.meta = null; S.metaTried = false;
+    if (typeof FIG !== "undefined") { FIG.urls.forEach(u => URL.revokeObjectURL(u)); FIG.urls.clear(); S.imgs = new Map(); } dec = null; S.bundles.clear(); S.catalog = {}; S.books = []; S.cur = null; S.ch = null;
     $("#shelf").innerHTML = ""; $("#stage").innerHTML = '<div class="empty">本棚から本と章を選んでください。</div>'; $("#rtools").hidden = true; $("#pbar").hidden = true; L = null;
     showGate();
   }
@@ -858,7 +862,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 
   async function openChapter(bid, no, quiet, then, atEnd) {
     S.cur = { bid, no }; S.open.add(bid); renderShelf(); hidePop();
-    const sumReady = loadSummaries(bid).catch(() => null);
+    const sumReady = Promise.all([loadSummaries(bid).catch(() => null), loadImages(bid).catch(() => null)]);
     if (mobile()) setMobile("reader");
     L = null; stage().innerHTML = '<div class="empty">本文を読み込み中…</div>';
     try {
@@ -882,13 +886,20 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 
   function chapterHTML(ch = S.ch) {
     let lastPg = null, html = "";
+    const figs = figuresFor(ch);          // 挿絵・図（段落の番号の順）
+    let fi = 0;
     for (const b of ch.blocks) {
+      const bn = Number(String(b.id).split("-b")[1]) || 0;
+      while (fi < figs.length && figs[fi].n < 0) fi++;
+      while (fi < figs.length && figs[fi].n < bn) html += figHTML(figs[fi++]);
       if (b.label.startsWith("p.") && b.label !== lastPg) { html += `<div class="pg">${esc(b.label)}</div>`; lastPg = b.label; }
       const m = b.text.match(/^#{1,6}\s+(.*)/s);
       const t = (m ? m[1] : b.text).replace(/\*\*|__/g, "");
       html += `<p class="blk${m ? " h" : ""}" data-id="${esc(b.id)}">${esc(t).replace(/\n/g, "<br>")}</p>`;
     }
-    return (isGenericTitle(ch.title) ? "" : `<h1 class="ctitle">${esc(ch.title)}</h1>`) + keyPoints(ch) + html;
+    while (fi < figs.length) { if (figs[fi].n >= 0) html += figHTML(figs[fi]); fi++; }
+    const lead = figs.filter(f => f.n < 0).map(figHTML).join("");    // 扉絵などは見出しより前
+    return lead + (isGenericTitle(ch.title) ? "" : `<h1 class="ctitle">${esc(ch.title)}</h1>`) + keyPoints(ch) + html;
   }
 
   // 置ける場所に合わせて A4 縦（1:√2）のページを決める。2枚並ぶ幅があれば見開き
@@ -919,6 +930,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
   function layout(target) {
     if (!S.ch) return;
     const g = geometry(), book = S.catalog[S.cur.bid], ch = S.ch, n = g.spread ? 2 : 1;
+    S.box = { tw:g.tw, th:g.th };
     const vars = `--pw:${g.pw}px;--ph:${g.ph}px;--mt:${g.mt}px;--mb:${g.mb}px;--ml:${g.ml}px;--tw:${g.tw}px;--th:${g.th}px;--cg:${g.cg}px;--fs:${S.fs}px`;
     const html = chapterHTML();
     let sheets = "";
@@ -1748,6 +1760,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
   const _layout = layout;
   layout = function (target) {
     const r = _layout(target);
+    loadFigures();
     const sp = stage().querySelector(".spread");
     if (sp && O.anim && target && !target.block && !matchMedia("(prefers-reduced-motion:reduce)").matches) { sp.classList.add("fadein"); setTimeout(() => sp.classList.remove("fadein"), 320); }
     return r;
@@ -1795,6 +1808,64 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
       <p class="note" style="font-size:12px;color:var(--muted)">項目を押すと、本文のその段落へ移ります。</p>`
       : `<p class="note">この章の要約はまだありません。claude.ai 版の書庫で要約を作り、「処理状況」から GitHub 版へ書き出すと出ます。</p>`), e.currentTarget);
   };
+
+  /* ================= 8. 挿絵と図（Mac が images/<本のID>/ に暗号化して置く） ================= */
+  S.imgs = new Map();
+  const FIG = { urls:new Map(), busy:0, queue:[] };
+  async function loadImages(bid) {
+    if (S.imgs.has(bid)) return S.imgs.get(bid);
+    let v = null;
+    try {
+      const r = await fetch(apiURL(`books/${encodeURIComponent(bid)}/images.json.age`), { headers:{ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
+      if (r.ok) v = JSON.parse(await dec.decrypt(new Uint8Array(await r.arrayBuffer()), "text"));
+    } catch {}
+    S.imgs.set(bid, v);
+    return v;
+  }
+  // この章の挿絵（「どの段落のあとか」の番号の順。段落が本文から消えていても、その位置に置く）
+  function figuresFor(ch) {
+    const man = S.imgs.get(S.cur?.bid);
+    if (!man?.images?.length) return [];
+    const pre = `c${ch.no}-b`;
+    return man.images.filter(x => String(x.after).startsWith(pre))
+      .map(x => ({ ...x, n:Number(String(x.after).slice(pre.length)) || 0 })).sort((a, b) => a.n - b.n)
+      .map(x => ({ ...x, n:x.n + .5 }));           // 段落 n のあと → n より大きく n+1 より小さい
+  }
+  // ページの中に収まる大きさを先に決めておく（画像が届く前後でページ割りが変わらないように）
+  function figHTML(f) {
+    const box = S.box || { tw:300, th:400 };
+    const mw = box.tw, mh = box.th * .9;
+    let w = f.w || mw, h = f.h || mw * .75;
+    const k = Math.min(1, mw / w, mh / h);
+    w = Math.max(24, Math.floor(w * k)); h = Math.max(24, Math.floor(h * k));
+    return `<figure class="fig" data-src="${esc(f.src)}" data-type="${esc(f.type || "image/jpeg")}" style="width:${w}px;height:${h}px"><img alt="${esc(f.alt || "")}" decoding="async"></figure>`;
+  }
+  async function figUrl(src, type) {
+    if (FIG.urls.has(src)) return FIG.urls.get(src);
+    const r = await fetch(apiURL(src), { headers:{ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
+    if (!r.ok) throw new Error(String(r.status));
+    const u = URL.createObjectURL(new Blob([await dec.decrypt(new Uint8Array(await r.arrayBuffer()))], { type }));
+    FIG.urls.set(src, u);
+    return u;
+  }
+  function loadFigures() {
+    const els = [...stage().querySelectorAll(".spread .fig[data-src]")];
+    if (!els.length) return;
+    const put = (src, u) => stage().querySelectorAll(`.fig[data-src="${CSS.escape(src)}"] img`).forEach(img => {
+      if (img.getAttribute("src") !== u) { img.onload = () => img.classList.add("on"); img.src = u; }
+    });
+    for (const src of new Set(els.map(e => e.dataset.src))) {
+      if (FIG.urls.has(src)) { put(src, FIG.urls.get(src)); continue; }
+      if (!FIG.queue.some(q => q[0] === src)) FIG.queue.push([src, els.find(e => e.dataset.src === src).dataset.type, put]);
+    }
+    const pump = () => {
+      while (FIG.busy < 4 && FIG.queue.length) {
+        const [src, type, pt] = FIG.queue.shift(); FIG.busy++;
+        figUrl(src, type).then(u => pt(src, u)).catch(() => {}).finally(() => { FIG.busy--; pump(); });
+      }
+    };
+    pump();
+  }
 
   /* ================= 18. Calibre のシリーズ・タグ（Mac が meta.json.age に置く） ================= */
   async function loadMeta() {

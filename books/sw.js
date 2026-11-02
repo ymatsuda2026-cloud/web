@@ -16,7 +16,7 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
 
   // 本文・要約・表紙はめったに変わらないので、保存分をすぐ返し、裏で新しいものに入れ替える（開くのを速く）
-  if (url.host === "api.github.com" && /\/contents\/(books\/[^/]+\/bundle\.json\.age|summaries\/[^/]+\.json\.age|thumbs\/[^/]+\.jpg\.age)$/.test(url.pathname)) {
+  if (url.host === "api.github.com" && /\/contents\/(books\/[^/]+\/bundle\.json\.age|summaries\/[^/]+\.json\.age|thumbs\/[^/]+\.jpg\.age|images\/[^/]+\/[^/]+\.age)$/.test(url.pathname)) {
     e.respondWith((async () => {
       const c = await caches.open(DATA);
       const hit = await c.match(req.url);
