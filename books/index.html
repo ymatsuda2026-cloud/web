@@ -549,9 +549,27 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       if (/見つかりません/.test(e.message)) throw new Error("この本の表示用データがまだ GitHub にありません。Mac で epub2gh を一度実行すると追加されます。");
       throw e;
     }
+    tidyBundle(b);
     S.bundles.set(bid, b);
     return b;
   }
+  // 目次などに残った「[文字](xxx.html#yyy)」のリンク先を消して、文字だけにする
+  function cleanLinks(t) {
+    return String(t ?? "")
+      .replace(/\[([^\[\]]*)\]\s*\(\s*[^()\s]*\s*\)/g, "$1")            // [文字](リンク先) → 文字
+      .replace(/\(\s*[^()\s]*\.x?html?(?:#[^()\s]*)?\s*\)/gi, "")        // 取り残された (xxx.html#yyy)
+      .replace(/\(\s*#[^()\s]+\s*\)/g, "")                                // (#目印)
+      .replace(/^(\s*\d+\.\s*)?\[([^\[\]]*)\]\s*$/, "$1$2")                // リンク先が別の段落に分かれた [文字]
+      .replace(/[ \t]+\n/g, "\n").trim();
+  }
+  function tidyBundle(b) {
+    for (const ch of b?.chapters || []) {
+      ch.title = cleanLinks(ch.title);
+      ch.blocks = (ch.blocks || []).map(x => ({ ...x, text:cleanLinks(x.text) })).filter(x => x.text);
+    }
+    return b;
+  }
+
 
   async function openChapter(bid, no, quiet, then, atEnd) {
     S.cur = { bid, no }; S.open.add(bid); renderShelf();
@@ -583,9 +601,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       const t = (m ? m[1] : b.text).replace(/\*\*|__/g, "");
       html += `<p class="blk${m ? " h" : ""}" data-id="${esc(b.id)}">${esc(t).replace(/\n/g, "<br>")}</p>`;
     }
-    const prev = chs[i - 1], next = chs[i + 1];
-    const nav = `<div class="chnav">${prev ? `<button data-go="${prev.no}">← ${esc(prev.title)}</button>` : ""}${next ? `<button data-go="${next.no}">次の章：${esc(next.title)} →</button>` : ""}</div>`;
-    return `<h1 class="ctitle">${esc(ch.title)}</h1>${html}${prev || next ? nav : ""}`;
+    return `<h1 class="ctitle">${esc(ch.title)}</h1>${html}`;
   }
 
   // 置ける場所に合わせて A4 縦（1:√2）のページを決める。2枚並ぶ幅があれば見開き
