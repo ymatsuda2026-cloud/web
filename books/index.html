@@ -3,10 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com; img-src data: 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <title>書庫</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#26335a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="書庫">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -75,6 +80,9 @@ button{cursor:pointer}
 .ch{display:block; width:100%; text-align:left; border:0; background:none; padding:5px 16px 5px 26px; font-size:13px}
 .ch:hover{background:var(--foil-soft)}
 .ch.on{background:var(--foil-soft); box-shadow:inset 3px 0 0 var(--foil)}
+.keep{display:flex; align-items:center; gap:6px; margin:0 16px 8px; border:1px dashed var(--line); background:transparent; color:var(--muted); border-radius:5px; padding:4px 10px; font-size:12px}
+.keep.on{border-style:solid; border-color:var(--foil); color:var(--ink)}
+.offl{font-size:11px; color:var(--foil-text); margin-left:6px}
 .empty{color:var(--muted); font-size:13.5px; padding:20px 16px; line-height:1.8; writing-mode:horizontal-tb}
 
 #reader{display:flex; flex-direction:column; min-height:0; overflow:hidden; background:var(--desk)}
@@ -279,7 +287,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 
   let secret = null, dec = null;      // 鍵を開けている間だけメモリに置く
   const S = { catalog:{}, books:[], bundles:new Map(), cur:null, ch:null, open:new Set(), q:"",
-              vert:true, fs:16.5, full:false, bms: ls.get(BMS, {}) };
+              vert:true, fs:16.5, full:false, bms: ls.get(BMS, {}), saved:new Set() };
   const p = ls.get(PREFS, {}); if (typeof p.vert === "boolean") S.vert = p.vert; if (p.fs) S.fs = p.fs;
   const savePrefs = () => ls.set(PREFS, { vert:S.vert, fs:S.fs });
 
@@ -309,7 +317,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     try {
       r = await fetch(url, { cache:"no-store", headers:{ Authorization:"Bearer " + sec.token,
         Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
-    } catch { throw new Error("GitHub につながりませんでした。通信状況を確認してください。"); }
+    } catch { throw new Error(navigator.onLine ? "GitHub につながりませんでした。通信状況を確認してください。" : "オフラインです。この本はまだこの端末に保存されていません。通信できる所で本棚の「この端末に保存」を押してください。"); }
     if (r.status === 401) throw new Error("トークンが無効か、期限切れです。");
     if (r.status === 404) {
       // リポジトリ自体は見えるのか、ファイルが無いだけなのかを切り分ける
@@ -385,7 +393,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 
   $("#reset").onclick = () => {
     const b = $("#reset");
-    if (b.dataset.armed) { ls.del(VAULT); delete b.dataset.armed; b.textContent = "この端末の設定を消して、最初から設定する"; showGate(); return; }
+    if (b.dataset.armed) { ls.del(VAULT); delete b.dataset.armed; if ("caches" in window) caches.delete("shoko-data").catch(() => {}); b.textContent = "この端末の設定を消して、最初から設定する"; showGate(); return; }
     b.dataset.armed = "1"; b.textContent = "もう一度押すと、この端末の設定を消します";
   };
 
@@ -401,6 +409,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     $("#gate").hidden = true; $("#bar").hidden = $("#app").hidden = $("#tabbar").hidden = false;
     applyMode();
     if (cat) setCatalog(cat); else await loadCatalog();
+    netState();
     const last = ls.get(LAST, null);
     if (last && S.catalog[last.bid] && !mobile()) openChapter(last.bid, last.no, true);
   }
@@ -417,7 +426,37 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
     S.books = Object.entries(S.catalog).map(([id, b]) => ({ id, ...b }))
       .sort((a, b) => String(b.converted || "").localeCompare(String(a.converted || "")));
     renderShelf();
+    refreshSaved();
   }
+
+  /* ---------- オフライン（暗号化されたまま端末に保存） ---------- */
+  const DATA_CACHE = "shoko-data";
+  const apiURL = path => `https://api.github.com/repos/${encodeURIComponent(secret.owner)}/${encodeURIComponent(secret.repo)}/contents/${path}`;
+  async function refreshSaved() {
+    if (!("caches" in window) || !secret) return;
+    try {
+      const c = await caches.open(DATA_CACHE), set = new Set();
+      for (const b of S.books) if (await c.match(apiURL(`books/${b.id}/bundle.json.age`))) set.add(b.id);
+      S.saved = set; renderShelf();
+    } catch {}
+  }
+  async function toggleKeep(bid) {
+    const url = apiURL(`books/${bid}/bundle.json.age`);
+    try {
+      const c = await caches.open(DATA_CACHE);
+      if (S.saved.has(bid)) { await c.delete(url); S.saved.delete(bid); status("この端末から消しました。"); }
+      else {
+        status("この端末に保存しています…");
+        await gh(`books/${bid}/bundle.json.age`);          // 取得するとサービスワーカーが暗号化されたまま保存する
+        if (!(await c.match(url))) await c.put(url, new Response(await gh(`books/${bid}/bundle.json.age`)));
+        S.saved.add(bid); status("保存しました。通信できない所でも、この本を読めます。");
+      }
+    } catch (e) { status(e.message || "保存できませんでした。"); }
+    renderShelf(); setTimeout(() => status(""), 3000);
+  }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  const netState = () => { if (!secret) return; status(navigator.onLine ? "" : "オフラインです。この端末に保存した本と、一度開いたことのある本を読めます。"); };
+  addEventListener("online", netState); addEventListener("offline", netState);
 
   /* ---------- 本棚 ---------- */
   const authorsOf = b => (b.authors || []).join(" / ");
@@ -432,15 +471,18 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       return `<div class="book">
         <button class="book-head" data-book="${esc(b.id)}" aria-expanded="${open}">
           <div class="book-title">${esc(b.title)}</div>
-          <div class="book-meta">${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc((b.type || "").toUpperCase())}・${(b.chapters || []).length}章</div>
+          <div class="book-meta">${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc((b.type || "").toUpperCase())}・${(b.chapters || []).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}</div>
         </button>
         ${bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む（${esc(bmCh.title)}）</button>` : ""}
+        ${open && "caches" in window ? `<button class="keep${S.saved.has(b.id) ? " on" : ""}" data-keep="${esc(b.id)}">${S.saved.has(b.id) ? "✓ この端末に保存済み（押すと消す）" : "↓ この端末に保存（オフライン用）"}</button>` : ""}
         ${open ? (b.chapters || []).map(c => `<button class="ch${S.cur?.bid === b.id && S.cur?.no === c.no ? " on" : ""}" data-bid="${esc(b.id)}" data-no="${c.no}">${esc(c.title)}</button>`).join("") : ""}
       </div>`;
     }).join("");
   }
   $("#q").addEventListener("input", e => { S.q = e.target.value.trim(); renderShelf(); });
   $("#shelf").addEventListener("click", e => {
+    const k = e.target.closest("[data-keep]");
+    if (k) return toggleKeep(k.dataset.keep);
     const h = e.target.closest("[data-book]");
     if (h) { const id = h.dataset.book; S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderShelf(); return; }
     const r = e.target.closest("[data-resume]");
