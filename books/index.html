@@ -158,6 +158,9 @@ body.full #reader{display:flex !important; background:var(--desk)}
   .tabbar button.on{color:var(--ink); box-shadow:inset 0 2px 0 var(--foil)}
   .bar .hb .lbl, .rtools .lbl{display:none}
   .search{max-width:none; min-width:0; font-size:16px; padding:5px 9px}
+  .bar{flex-wrap:wrap}
+  .bar .search{order:9; flex:1 1 100%}
+  .brand{margin-right:auto}
   .bar{gap:6px; padding:8px 10px}
   .brand{white-space:nowrap; font-size:18px}
   .hb{white-space:nowrap; padding:0 8px; flex:none}
@@ -264,6 +267,44 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 .kp{border:1px solid var(--bunko-rule); border-radius:4px; padding:.7em .9em; margin-block:0 1.4em; font-family:var(--sans); font-size:.86em; line-height:1.75; break-inside:avoid}
 .kp b{display:block; font-size:.9em; color:var(--bunko-muted); margin-block-end:.3em}
 .kp ol{margin:0; padding-inline-start:1.3em}
+/* マーカーとメモ */
+:root{--hl-y:rgba(243,206,90,.45); --hl-b:rgba(120,172,226,.38); --hl-p:rgba(236,150,172,.38)}
+mark.hl{color:inherit; border-radius:2px; padding:0; cursor:pointer}
+mark.hl.c-y{background:var(--hl-y)} mark.hl.c-b{background:var(--hl-b)} mark.hl.c-p{background:var(--hl-p)}
+mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-offset:3px}
+.sw{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; flex:none}
+.sw.c-y{background:#e6bf3f} .sw.c-b{background:#6fa6dc} .sw.c-p{background:#e58fa6}
+.seltool{position:fixed; z-index:44; display:flex; gap:2px; background:#232838; color:#fff; border-radius:9px; padding:4px; box-shadow:0 8px 22px rgba(0,0,0,.3)}
+.seltool button{border:0; background:none; color:#fff; padding:7px 10px; border-radius:6px; font-size:13px; white-space:nowrap; display:flex; align-items:center}
+.seltool button:hover{background:rgba(255,255,255,.12)}
+.nq{font-family:var(--serif); font-size:14px; line-height:1.7; background:var(--sheet); border-left:3px solid var(--foil); padding:6px 10px; margin:0; max-height:9em; overflow:auto}
+#pop textarea{width:100%; border:1px solid var(--line); border-radius:6px; padding:7px 9px; font:14px/1.6 var(--sans); background:var(--sheet); color:var(--ink); resize:vertical}
+.tb.main{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth)}
+.ncols{display:grid; grid-template-columns:220px minmax(0,1fr); gap:20px}
+.nside .lbl{font-size:12px; color:var(--muted); margin:12px 0 6px}
+.nside .lbl:first-child{margin-top:0}
+.nside input{width:100%; border:1px solid var(--line); border-radius:6px; padding:6px 9px; font-size:14px; background:var(--sheet)}
+.nside .chips{display:flex; flex-wrap:wrap; gap:5px}
+.brow{display:flex; align-items:center; gap:8px; margin:5px 0}
+.brow .bt{width:11em; flex:none; text-align:left; border:0; background:none; padding:0; font-size:13px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.bbar{display:flex; height:12px; border-radius:3px; overflow:hidden; min-width:4px}
+.bbar i.c-y{background:#e6bf3f} .bbar i.c-b{background:#6fa6dc} .bbar i.c-p{background:#e58fa6}
+.bn{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
+.strip{position:relative; height:28px; background:var(--sheet); border:1px solid var(--line); border-radius:5px}
+.strip .sm{position:absolute; top:4px; width:4px; height:18px; border:0; border-radius:2px; padding:0; transform:translateX(-2px); cursor:pointer}
+.strip .sm.c-y{background:#e6bf3f} .strip .sm.c-b{background:#6fa6dc} .strip .sm.c-p{background:#e58fa6}
+.sticks{position:relative; height:18px; font-size:11px; color:var(--muted)}
+.sticks span{position:absolute; top:2px; white-space:nowrap; border-left:1px solid var(--line); padding-left:3px}
+.hint{font-size:12.5px; color:var(--muted)}
+.nlist{border-top:1px solid var(--line)}
+.nitem{display:flex; gap:8px; width:100%; text-align:left; border:0; border-bottom:1px solid var(--line); background:none; padding:9px 4px; color:var(--ink)}
+.nitem:hover{background:var(--foil-soft)}
+.nitem .sw{margin-top:6px}
+.nb{display:flex; flex-direction:column; gap:3px; min-width:0}
+.nq2{font-family:var(--serif); line-height:1.7; font-size:14px}
+.nmemo{font-size:13px; background:var(--sheet); border-radius:6px; padding:4px 8px; color:var(--ink)}
+.nmeta{font-size:11.5px; color:var(--muted)}
+@media (max-width:820px){ .ncols{grid-template-columns:1fr} }
 .fig{margin:.9em auto; break-inside:avoid; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03); border-radius:2px}
 .fig img{max-width:100%; max-height:100%; object-fit:contain; opacity:0; transition:opacity .2s}
 .fig img.on{opacity:1}
@@ -377,6 +418,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 <header class="bar" id="bar" hidden>
   <div class="brand">書庫</div>
   <input class="search" id="q" type="search" placeholder="書名・著者で探す（Enter で本文も）" aria-label="書名・著者で探す。Enter で本文も探す" enterkeyhint="search">
+  <button class="hb" id="notesBtn" aria-pressed="false" title="マーカーとメモ">ノート</button>
   <button class="hb" id="statsBtn" aria-pressed="false" title="読書の記録">記録</button>
   <button class="hb" id="nightBtn" aria-pressed="false" title="毎日23時の変換処理の結果">夜間<span class="lbl">処理</span></button>
   <button class="hb" id="manageBtn" aria-pressed="false" title="NAS の本の変換を管理する">変換<span class="lbl">管理</span></button>
@@ -428,6 +470,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 <section id="night" hidden aria-label="夜間処理の状況"></section>
 <section id="stats" class="panel" hidden aria-label="読書の記録"></section>
 <section id="search" class="panel" hidden aria-label="本文の検索"></section>
+<section id="notes" class="panel" hidden aria-label="ノート"></section>
 <div class="pop" id="pop" role="dialog" hidden></div>
 <nav class="tabbar" id="tabbar" hidden>
   <button data-m="shelf" class="on">本棚</button>
@@ -1289,7 +1332,8 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
     if (name && S.full) setFull(false);
     document.body.classList.remove("imm", "chrome");
     $("#manage").hidden = name !== "manage"; $("#night").hidden = name !== "night";
-    $("#stats").hidden = name !== "stats"; $("#search").hidden = name !== "search"; hidePop();
+    $("#stats").hidden = name !== "stats"; $("#search").hidden = name !== "search"; $("#notes").hidden = name !== "notes"; hidePop();
+    if (typeof hideSelTool === "function") hideSelTool();
     $("#app").hidden = !!name; $("#tabbar").hidden = !!name; $("#q").hidden = !!name && name !== "search";
     const back = '本棚へ<span class="lbl">戻る</span>';
     $("#manageBtn").setAttribute("aria-pressed", String(name === "manage"));
@@ -1298,10 +1342,13 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
     $("#nightBtn").innerHTML = name === "night" ? back : '夜間<span class="lbl">処理</span>';
     $("#statsBtn").setAttribute("aria-pressed", String(name === "stats"));
     $("#statsBtn").innerHTML = name === "stats" ? back : "記録";
+    $("#notesBtn").setAttribute("aria-pressed", String(name === "notes"));
+    $("#notesBtn").innerHTML = name === "notes" ? back : "ノート";
     try { history.replaceState(null, "", name ? "#" + name : location.pathname + location.search); } catch {}
     if (name === "manage") { if (!S.inv) loadManage(); else renderManage(); }
     else if (name === "night") loadNight();
     else if (name === "stats") renderStats();
+    else if (name === "notes") renderNotesPanel();
     else if (name === "search") renderSearch();
     else { updateImm(); if (L) requestAnimationFrame(relayout); }
   }
@@ -1309,6 +1356,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
   $("#manageBtn").onclick = () => setPanel(S.panel === "manage" ? null : "manage");
   $("#nightBtn").onclick = () => setPanel(S.panel === "night" ? null : "night");
   $("#statsBtn").onclick = () => setPanel(S.panel === "stats" ? null : "stats");
+  $("#notesBtn").onclick = () => setPanel(S.panel === "notes" ? null : "notes");
 
   async function loadQueue() {
     let r;
@@ -1588,7 +1636,11 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
     const d = { ...(r.days || {}) };
     for (const [k, v] of Object.entries(RS.days || {})) { const o = d[k] || {}; d[k] = { m:Math.max(o.m || 0, v.m || 0), p:Math.max(o.p || 0, v.p || 0) }; }
     RS.days = d;
+    const nn = { ...(RS.notes || {}) };
+    for (const [bid, m] of Object.entries(r.notes || {})) nn[bid] = newer(nn[bid], m);
+    RS.notes = nn;
     ls.set(RS_KEY, RS); ls.set(BMS, RS.bms);
+    if (typeof renderMarks === "function") renderMarks();
   }
   const STATE_PATH = "reader/state.json.age";
   async function syncPull() {
@@ -1688,7 +1740,8 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
     const p = $("#pop"); p.innerHTML = `<button class="x" data-px="1" aria-label="閉じる">×</button>` + html; p.hidden = false;
     const r = anchor.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
     let left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
-    let top = r.bottom + 8; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+    let top = r.bottom + 8; if (top + h > innerHeight - 8) top = r.top - h - 8;
+    top = Math.max(8, Math.min(innerHeight - h - 8, top));
     p.style.left = left + "px"; p.style.top = top + "px";
     clearTimeout(chromeT);                         // 小窓を開いている間は帯を隠さない
   }
@@ -1761,6 +1814,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
   layout = function (target) {
     const r = _layout(target);
     loadFigures();
+    renderMarks();
     const sp = stage().querySelector(".spread");
     if (sp && O.anim && target && !target.block && !matchMedia("(prefers-reduced-motion:reduce)").matches) { sp.classList.add("fadein"); setTimeout(() => sp.classList.remove("fadein"), 320); }
     return r;
@@ -1808,6 +1862,243 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
       <p class="note" style="font-size:12px;color:var(--muted)">項目を押すと、本文のその段落へ移ります。</p>`
       : `<p class="note">この章の要約はまだありません。claude.ai 版の書庫で要約を作り、「処理状況」から GitHub 版へ書き出すと出ます。</p>`), e.currentTarget);
   };
+
+  /* ================= マーカーとメモ・ノート画面 =================
+     記録は RS.notes[本のID][メモのID] に置き、読書の記録と一緒に暗号化して GitHub で同期する。
+     位置は「段落のID＋その段落の中の何文字目から何文字目か」。消したものは del を立てて残す（同期のため） */
+  RS.notes = RS.notes || {};
+  const NCOL = { y:"重要", b:"疑問", p:"使える" };
+  const nid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const liveNotes = bid => Object.values(RS.notes[bid] || {}).filter(n => !n.del);
+  const allNotes = () => Object.entries(RS.notes).flatMap(([bid, m]) => Object.values(m).filter(n => !n.del).map(n => ({ ...n, bid })));
+
+  // 段落の中の文字の位置
+  function offIn(blk, node, off) {
+    const r = document.createRange(); r.selectNodeContents(blk);
+    try { r.setEnd(node, off); } catch { return 0; }
+    return r.toString().length;
+  }
+  function selInfo() {
+    const sel = getSelection();
+    if (!L || !sel.rangeCount || sel.isCollapsed) return null;
+    const r = sel.getRangeAt(0);
+    const el = n => (n.nodeType === 1 ? n : n.parentElement);
+    const f = el(r.startContainer)?.closest(".flow"); if (!f || !L.flows.includes(f)) return null;
+    let sb = el(r.startContainer).closest(".blk"), eb = el(r.endContainer).closest(".blk");
+    const blks = [...f.querySelectorAll(".blk")];
+    if (!sb) sb = blks.find(b => r.comparePoint(b, 0) >= 0 && r.intersectsNode(b));
+    if (!eb) eb = [...blks].reverse().find(b => r.intersectsNode(b));
+    if (!sb || !eb) return null;
+    const start = sb.contains(r.startContainer) ? offIn(sb, r.startContainer, r.startOffset) : 0;
+    const end = eb.contains(r.endContainer) ? offIn(eb, r.endContainer, r.endOffset) : eb.textContent.length;
+    const quote = r.toString().replace(/\s+/g, " ").trim();
+    if (!quote) return null;
+    // 見えている部分の位置（見開きの隠れたページにかかる分は除く）
+    const vr = stage().getBoundingClientRect();
+    const vis = [...r.getClientRects()].filter(x => x.width && x.height && x.right > vr.left && x.left < vr.right && x.bottom > vr.top && x.top < vr.bottom);
+    const rect = vis.length ? vis.reduce((a, x) => ({ left:Math.min(a.left, x.left), right:Math.max(a.right, x.right), top:Math.min(a.top, x.top), bottom:Math.max(a.bottom, x.bottom) }),
+      { left:vis[0].left, right:vis[0].right, top:vis[0].top, bottom:vis[0].bottom }) : r.getBoundingClientRect();
+    rect.width = rect.right - rect.left;
+    return { block:sb.dataset.id, start, eblock:eb.dataset.id, end, quote:quote.slice(0, 1000), rect };
+  }
+  // 本の中のおおよその位置（0〜1）。ノート画面で「本のどこに線を引いたか」を描くのに使う
+  function bookPos(blockId) {
+    const chs = chaptersOf(), ci = Math.max(0, chs.findIndex(c => c.no === S.ch.no));
+    const bi = Math.max(0, S.ch.blocks.findIndex(b => b.id === blockId));
+    return chs.length ? (ci + bi / Math.max(1, S.ch.blocks.length)) / chs.length : 0;
+  }
+  function addNote(info, color, text) {
+    const bid = S.cur.bid, id = nid();
+    (RS.notes[bid] = RS.notes[bid] || {})[id] = { id, no:S.ch.no, block:info.block, start:info.start, eblock:info.eblock, end:info.end,
+      quote:info.quote, color, text:text || "", pos:Math.round(bookPos(info.block) * 1000) / 1000, at:Date.now() };
+    saveRS(); getSelection().removeAllRanges(); hideSelTool(); renderMarks();
+    return id;
+  }
+
+  // 本文に色を付ける（左右の2つの本文の両方に）
+  function wrapRange(r, cls, id) {
+    const root = r.commonAncestorContainer.nodeType === 3 ? r.commonAncestorContainer.parentNode : r.commonAncestorContainer;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [];
+    let n; while ((n = w.nextNode())) if (r.intersectsNode(n)) nodes.push(n);
+    const sc = r.startContainer, so = r.startOffset, ec = r.endContainer, eo = r.endOffset;
+    for (const t of nodes) {
+      const s = t === sc ? so : 0, e = t === ec ? eo : t.length;
+      if (e <= s) continue;
+      let mid = s > 0 ? t.splitText(s) : t;
+      if (e - s < mid.length) mid.splitText(e - s);
+      const m = document.createElement("mark"); m.className = "hl " + cls; m.dataset.nid = id;
+      mid.parentNode.insertBefore(m, mid); m.appendChild(mid);
+    }
+  }
+  function renderMarks() {
+    if (!L || !S.ch) return;
+    for (const m of stage().querySelectorAll("mark.hl")) { const p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); m.remove(); p.normalize(); }
+    const ns = liveNotes(S.cur.bid).filter(n => n.no === S.ch.no);
+    for (const f of L.flows) for (const n of ns) {
+      const sb = f.querySelector(`.blk[data-id="${CSS.escape(n.block)}"]`), eb = f.querySelector(`.blk[data-id="${CSS.escape(n.eblock || n.block)}"]`);
+      if (!sb || !eb) continue;
+      const a = textPoint(sb, Math.min(n.start, Math.max(0, sb.textContent.length - 1)));
+      const z = textPoint(eb, Math.max(0, Math.min(n.end, eb.textContent.length) - 1));
+      if (!a || !z) continue;
+      const r = document.createRange();
+      try { r.setStart(a[0], a[1]); r.setEnd(z[0], z[1] + 1); } catch { continue; }
+      wrapRange(r, "c-" + (n.color || "y") + (n.text ? " memo" : ""), n.id);
+    }
+  }
+
+  // 選んだときの道具（重要・疑問・使える・メモ・コピー）
+  const seltool = document.createElement("div");
+  seltool.className = "seltool"; seltool.hidden = true; seltool.setAttribute("role", "toolbar"); seltool.setAttribute("aria-label", "選んだ文に");
+  seltool.innerHTML = `<button data-st="y"><i class="sw c-y"></i>重要</button><button data-st="b"><i class="sw c-b"></i>疑問</button><button data-st="p"><i class="sw c-p"></i>使える</button><button data-st="memo">メモ</button><button data-st="copy">コピー</button>`;
+  document.body.appendChild(seltool);
+  function hideSelTool() { seltool.hidden = true; }
+  let selT = 0;
+  document.addEventListener("selectionchange", () => {
+    clearTimeout(selT);
+    selT = setTimeout(() => {
+      const info = selInfo();
+      if (!info || S.panel) { if (!seltool.matches(":hover")) hideSelTool(); return; }
+      S.lastSel = { ...info, bid:S.cur.bid, no:S.ch.no, t:Date.now() };
+      seltool.hidden = false;
+      const r = info.rect, w = seltool.offsetWidth, h = seltool.offsetHeight;
+      let top = r.bottom + 10; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 10);
+      seltool.style.top = top + "px";
+      seltool.style.left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)) + "px";
+      clearTimeout(chromeT);
+    }, 220);
+  });
+  seltool.addEventListener("mousedown", e => e.preventDefault());         // 押しても選択が消えないように
+  seltool.addEventListener("click", async e => {
+    const b = e.target.closest("[data-st]"); if (!b) return;
+    // スマホでは道具を押した時点で選択が外れることがあるので、直前に覚えた選択を使う
+    let info = selInfo();
+    if (!info && S.lastSel && S.lastSel.bid === S.cur?.bid && S.lastSel.no === S.ch?.no && Date.now() - S.lastSel.t < 60000) info = S.lastSel;
+    if (!info) return hideSelTool();
+    const k = b.dataset.st;
+    if (k === "copy") { try { await navigator.clipboard.writeText(info.quote); status("コピーしました。"); setTimeout(() => status(""), 1500); } catch {} hideSelTool(); return; }
+    if (k === "memo") { const id = addNote(info, "y", ""); return openNote(S.cur.bid, id, true); }
+    addNote(info, k, "");
+  });
+
+  // 色を付けた所を押したとき：色の変更・メモ・消す
+  function openNote(bid, id, focus) {
+    const n = RS.notes[bid]?.[id]; if (!n) return;
+    const vr = stage().getBoundingClientRect();
+    const anchor = [...stage().querySelectorAll(`mark.hl[data-nid="${CSS.escape(id)}"]`)].find(m => { const q = m.getBoundingClientRect(); return q.width && q.top >= vr.top && q.bottom <= vr.bottom && q.left >= vr.left && q.right <= vr.right; }) || $("#rtools");
+    showPop(`<h3>マーカー・メモ</h3>
+      <p class="nq">${esc(n.quote)}</p>
+      <div class="chips" style="margin:6px 0 10px">${Object.entries(NCOL).map(([c, l]) => `<button class="chip${n.color === c ? " on" : ""}" data-ncol="${c}"><i class="sw c-${c}"></i>${l}</button>`).join("")}</div>
+      <textarea id="ntext" rows="4" placeholder="メモを書く（なくてもよい）">${esc(n.text || "")}</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="tb" data-ndel="1">消す</button><span style="flex:1"></span><button class="tb main" data-nsave="1">保存</button></div>`, anchor);
+    const pop = $("#pop"); pop.dataset.bid = bid; pop.dataset.nid = id;
+    if (focus) setTimeout(() => $("#ntext")?.focus(), 50);
+  }
+  $("#pop").addEventListener("click", e => {
+    const pop = $("#pop"), bid = pop.dataset.bid, id = pop.dataset.nid, n = RS.notes[bid]?.[id];
+    if (!n) return;
+    const c = e.target.closest("[data-ncol]");
+    if (c) { n.color = c.dataset.ncol; n.at = Date.now(); pop.querySelectorAll("[data-ncol]").forEach(x => x.classList.toggle("on", x === c)); saveRS(); renderMarks(); return; }
+    if (e.target.closest("[data-nsave]")) { n.text = $("#ntext").value.trim(); n.at = Date.now(); saveRS(); hidePop(); renderMarks(); if (S.panel === "notes") renderNotesPanel(); return; }
+    if (e.target.closest("[data-ndel]")) { n.del = true; n.at = Date.now(); saveRS(); hidePop(); renderMarks(); if (S.panel === "notes") renderNotesPanel(); }
+  });
+  stage().addEventListener("click", e => {
+    const m = e.target.closest("mark.hl");
+    if (m && getSelection().isCollapsed) { e.stopImmediatePropagation(); openNote(S.cur.bid, m.dataset.nid); }
+  }, true);
+
+  /* ---------- ノート画面：集めて見る・可視化・書き出し ---------- */
+  const NF = { kind:"all", period:"month", book:"all", q:"" };
+  function notesFiltered() {
+    const now = Date.now(), lim = { week:7, month:31, q3:92, all:1e6 }[NF.period] * 86400000, q = NF.q.toLowerCase();
+    return allNotes().filter(n => (NF.kind === "all" || (NF.kind === "memo" ? !!n.text : n.color === NF.kind))
+      && now - n.at <= lim && (NF.book === "all" || n.bid === NF.book)
+      && (!q || (n.quote + " " + (n.text || "")).toLowerCase().includes(q))).sort((a, b) => b.at - a.at);
+  }
+  function renderNotesPanel() {
+    const el = $("#notes"), list = notesFiltered(), all = allNotes();
+    const chips = (key, items) => `<div class="chips">${items.map(([v, l]) => `<button class="chip${NF[key] === v ? " on" : ""}" data-nf="${key}" data-v="${v}">${l}</button>`).join("")}</div>`;
+    const books = [...new Set(all.map(n => n.bid))].filter(b => S.catalog[b]);
+    const byBook = new Map();
+    for (const n of list) { const o = byBook.get(n.bid) || { y:0, b:0, p:0, m:0, t:0 }; o[n.color || "y"]++; if (n.text) o.m++; o.t++; byBook.set(n.bid, o); }
+    const rows = [...byBook.entries()].sort((a, b) => b[1].t - a[1].t), maxT = Math.max(1, ...rows.map(r => r[1].t));
+    const cnt = { y:0, b:0, p:0 }; list.forEach(n => cnt[n.color || "y"]++);
+    const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+    // 記録した日（12週間）
+    const days = {}; all.forEach(n => { const k = ymd(new Date(n.at)); days[k] = (days[k] || 0) + 1; });
+    const now = new Date(), st = new Date(now); st.setDate(st.getDate() - st.getDay() - 7 * 11);
+    let heat = ""; for (let i = 0; i < 84; i++) { const d = new Date(st); d.setDate(st.getDate() + i); const v = days[ymd(d)] || 0;
+      heat += `<i class="${d > now ? "fut" : v >= 8 ? "l4" : v >= 4 ? "l3" : v >= 2 ? "l2" : v ? "l1" : ""}" title="${d.getMonth() + 1}/${d.getDate()}　${v}件"></i>`; }
+    // 本のどこに線を引いたか
+    const sbid = NF.book !== "all" ? NF.book : rows[0]?.[0];
+    const sb = sbid && S.catalog[sbid];
+    let strip = "";
+    if (sb) {
+      const chs = sb.chapters || [], gs = chapterGroups(sb);
+      const marks = liveNotes(sbid).map(n => `<button class="sm c-${n.color || "y"}" style="left:${(n.pos || 0) * 100}%" data-open="${esc(sbid)}|${esc(n.id)}" title="${esc(n.quote.slice(0, 60))}" aria-label="${esc(n.quote.slice(0, 30))}"></button>`).join("");
+      const ticks = gs.slice(0, 8).map(g => `<span style="left:${chs.findIndex(c => c.no === g.no) / Math.max(1, chs.length) * 100}%">${esc(g.title.slice(0, 10))}</span>`).join("");
+      strip = `<h3>本のどこに線を引いたか（${esc(sb.title)}）</h3><div class="strip">${marks}</div><div class="sticks">${ticks}</div>
+        <p class="hint">印を押すと、その所が開きます。印が集まっている所が、あなたにとって大事な部分です。</p>`;
+    }
+    el.innerHTML = `<h2>ノート</h2>
+      <div class="ncols"><div class="nside">
+        <div class="lbl">種類</div>${chips("kind", [["all","すべて"],["y","重要"],["b","疑問"],["p","使える"],["memo","メモあり"]])}
+        <div class="lbl">期間</div>${chips("period", [["week","今週"],["month","今月"],["q3","3か月"],["all","全部"]])}
+        <div class="lbl">本</div>${chips("book", [["all","すべて"], ...books.map(b => [b, S.catalog[b].title.slice(0, 14)])])}
+        <div class="lbl">言葉で探す</div><input id="nq" type="search" value="${esc(NF.q)}" placeholder="引用・メモから探す">
+        <div class="lbl">書き出し（絞り込んだ分）</div><div class="chips"><button class="tb" data-nexp="save">Markdown で保存</button><button class="tb" data-nexp="copy">コピー</button></div>
+      </div><div class="nmain">
+        <div class="nmet">
+          <div class="nm"><div class="l">記録</div><div class="v">${list.length}</div></div>
+          <div class="nm"><div class="l">メモ</div><div class="v">${list.filter(n => n.text).length}</div></div>
+          <div class="nm"><div class="l">記録した本</div><div class="v">${byBook.size}冊</div></div>
+          <div class="nm"><div class="l">いちばん多い色</div><div class="v">${top && top[1] ? `<i class="sw c-${top[0]}"></i>${NCOL[top[0]]}` : "—"}</div></div>
+        </div>
+        ${rows.length ? `<h3>本ごとの数と色の内訳</h3>${rows.slice(0, 8).map(([b, o]) => `<div class="brow"><button class="bt" data-nfb="${esc(b)}">${esc((S.catalog[b]?.title || b).slice(0, 18))}</button>
+          <span class="bbar" style="width:${o.t / maxT * 100}%"><i class="c-y" style="flex:${o.y}"></i><i class="c-b" style="flex:${o.b}"></i><i class="c-p" style="flex:${o.p}"></i></span><span class="bn">${o.t}</span></div>`).join("")}` : ""}
+        <h3>記録した日（12週間）</h3><div class="heat">${heat}</div>
+        ${strip}
+        <h3>一覧（新しい順）</h3>
+        <div class="nlist">${list.slice(0, 300).map(n => { const b = S.catalog[n.bid];
+          return `<button class="nitem" data-open="${esc(n.bid)}|${esc(n.id)}"><span class="sw c-${n.color || "y"}"></span>
+            <span class="nb"><span class="nq2">${esc(n.quote.slice(0, 220))}</span>${n.text ? `<span class="nmemo">${esc(n.text)}</span>` : ""}
+            <span class="nmeta">${esc(b?.title || "")}・${esc((b && titleFor(b, n.no)) || "")}・${esc(jdt(n.at))}</span></span></button>`; }).join("")
+          || '<p class="hint">まだありません。本文を選ぶと出る「重要」「疑問」「使える」「メモ」で記録できます。</p>'}</div>
+      </div></div>`;
+    const qi = $("#nq"); qi.addEventListener("input", () => { NF.q = qi.value.trim(); clearTimeout(qi._t); qi._t = setTimeout(() => { renderNotesPanel(); const x = $("#nq"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }, 300); });
+  }
+  $("#notes").addEventListener("click", e => {
+    const f = e.target.closest("[data-nf]"); if (f) { NF[f.dataset.nf] = f.dataset.v; return renderNotesPanel(); }
+    const fb = e.target.closest("[data-nfb]"); if (fb) { NF.book = fb.dataset.nfb; return renderNotesPanel(); }
+    const x = e.target.closest("[data-nexp]"); if (x) return exportNotes(x.dataset.nexp);
+    const o = e.target.closest("[data-open]");
+    if (o) {
+      const [bid, id] = o.dataset.open.split("|"), n = RS.notes[bid]?.[id]; if (!n) return;
+      setPanel(null);
+      openChapter(bid, n.no, false, () => jump(n.block, false, n.start));
+    }
+  });
+  async function exportNotes(how) {
+    const list = notesFiltered().slice().sort((a, b) => a.bid.localeCompare(b.bid) || a.no - b.no || (a.pos || 0) - (b.pos || 0) || (a.start || 0) - (b.start || 0));
+    if (!list.length) { status("書き出すものがありません。"); setTimeout(() => status(""), 2000); return; }
+    let md = `# ノート\n\n書き出し：${new Date().toLocaleString("ja-JP")}\n`;
+    let lb = null, lc = null;
+    for (const n of list) {
+      const b = S.catalog[n.bid];
+      if (n.bid !== lb) { md += `\n## ${b?.title || n.bid}\n`; lb = n.bid; lc = null; }
+      const ct = (b && titleFor(b, n.no)) || "冒頭";
+      if (ct !== lc) { md += `\n### ${ct}\n`; lc = ct; }
+      md += `\n> ${n.quote.replace(/\n/g, " ")}\n\n［${NCOL[n.color || "y"]}］${n.text ? " " + n.text.replace(/\n/g, "  \n") : ""}　（${ymd(new Date(n.at))}）\n`;
+    }
+    if (how === "copy") {
+      try { await navigator.clipboard.writeText(md); status("コピーしました。Notion などに貼り付けられます。"); } catch { status("コピーできませんでした。"); }
+      setTimeout(() => status(""), 2500); return;
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([md], { type:"text/markdown" }));
+    a.download = `ノート_${ymd(new Date())}.md`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
 
   /* ================= 8. 挿絵と図（Mac が images/<本のID>/ に暗号化して置く） ================= */
   S.imgs = new Map();
