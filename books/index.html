@@ -233,6 +233,67 @@ body.imm .stage{background:var(--desk)}
 .ntail{font:12px/1.6 ui-monospace,Menlo,monospace; background:var(--sheet); border:1px solid var(--line); border-radius:6px; padding:10px 12px; white-space:pre-wrap; word-break:break-all; max-height:260px; overflow:auto}
 .nnote{font-size:13px; color:var(--muted); line-height:1.75; background:var(--sheet); border:1px dashed var(--line); border-radius:8px; padding:10px 14px; margin-top:12px}
 .nnote code{font-size:12px}
+/* 追加：目次・要約・設定の小窓、早送り、記録、検索 */
+.go.alt{background:transparent; color:var(--ink); border:1px solid var(--line); margin-top:10px}
+.scrubw{position:relative; flex:1 1 160px; min-width:110px; display:flex; align-items:center; padding:0 6px}
+#scrub{width:100%; accent-color:var(--foil); height:22px; margin:0}
+.scrubtip{position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); white-space:nowrap; background:rgba(30,34,48,.92); color:#fff; font-size:12px; border-radius:6px; padding:4px 9px; pointer-events:none; z-index:40; max-width:70vw; overflow:hidden; text-overflow:ellipsis}
+body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
+.pop{position:fixed; z-index:45; width:min(380px,calc(100vw - 16px)); max-height:min(70vh,640px); overflow:auto; overscroll-behavior:contain; background:var(--paper); color:var(--ink);
+  border:1px solid var(--line); border-radius:10px; box-shadow:0 16px 40px rgba(20,24,40,.28); padding:12px 14px}
+.pop h3{font-family:var(--serif); font-size:15px; margin:2px 0 8px}
+.pop .x{position:sticky; top:-12px; float:right; border:0; background:var(--paper); font-size:18px; color:var(--muted); padding:0 4px}
+.toc{list-style:none; margin:0; padding:0}
+.toc button{display:flex; gap:8px; width:100%; text-align:left; border:0; background:none; padding:8px 6px; border-radius:6px; font-size:14px; line-height:1.5; color:var(--ink)}
+.toc button:hover{background:var(--foil-soft)}
+.toc button.on{background:var(--foil-soft); box-shadow:inset 3px 0 0 var(--foil)}
+.toc .pn{margin-left:auto; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums}
+.sumpts{margin:0 0 12px; padding-left:1.3em}
+.sumpts li{margin-bottom:8px; line-height:1.7; font-size:14px}
+.sumpts button{border:0; background:none; text-align:left; padding:0; color:inherit; font:inherit; cursor:pointer}
+.sumpts button:hover{text-decoration:underline; text-decoration-color:var(--foil)}
+.mm ul{list-style:none; margin:0; padding-left:14px; border-left:1px solid var(--line)}
+.mm > ul{padding-left:0; border-left:0}
+.mm li{margin:4px 0}
+.mm .nd{border:1px solid var(--line); background:var(--sheet); border-radius:12px; padding:2px 10px; font-size:13px; line-height:1.6; color:var(--ink); text-align:left}
+.mm .nd.root{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth)}
+.optrow{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px}
+.optrow:last-child{border-bottom:0}
+.optrow .lb{flex:1}
+.optrow .note{display:block; font-size:12px; color:var(--muted)}
+.kp{border:1px solid var(--bunko-rule); border-radius:4px; padding:.7em .9em; margin-block:0 1.4em; font-family:var(--sans); font-size:.86em; line-height:1.75; break-inside:avoid}
+.kp b{display:block; font-size:.9em; color:var(--bunko-muted); margin-block-end:.3em}
+.kp ol{margin:0; padding-inline-start:1.3em}
+.spread.anim .flow{transition:transform .32s cubic-bezier(.2,.7,.2,1)}
+.spread.fadein{animation:shkfade .28s ease}
+@keyframes shkfade{from{opacity:.25}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.spread.anim .flow{transition:none}.spread.fadein{animation:none}}
+.panel{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:16px 18px 48px}
+.panel h2{font-family:var(--serif); font-size:18px; margin:0 0 12px}
+.panel h3{font-size:14px; margin:22px 0 8px}
+.heat{display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,14px); grid-auto-columns:14px; gap:3px; overflow-x:auto; padding-bottom:4px}
+.heat i{border-radius:3px; background:var(--line)}
+.heat i.l1{background:rgba(169,130,42,.3)} .heat i.l2{background:rgba(169,130,42,.55)} .heat i.l3{background:rgba(169,130,42,.8)} .heat i.l4{background:var(--foil)} .heat i.fut{background:transparent}
+.legend{display:flex; gap:4px; align-items:center; font-size:11px; color:var(--muted); margin-top:6px}
+.legend i{width:12px; height:12px; border-radius:3px; display:inline-block}
+.hit-b{font-family:var(--serif); font-weight:600; margin:18px 0 6px}
+.hit{display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--line); background:none; padding:8px 4px; font-size:13.5px; line-height:1.7; color:var(--ink)}
+.hit:hover{background:var(--foil-soft)}
+.hit .hc{font-size:11.5px; color:var(--muted)}
+.hit mark{background:rgba(243,211,107,.6); color:inherit; border-radius:2px}
+.srow{display:flex; gap:8px; margin-bottom:10px}
+.srow input{flex:1; min-width:0; border:1px solid var(--line); background:var(--sheet); border-radius:6px; padding:8px 10px; font-size:15px}
+.shelfopts{display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px 4px}
+.shelfopts select{border:1px solid var(--line); background:var(--sheet); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px}
+.chip{border:1px solid var(--line); background:var(--sheet); color:var(--muted); border-radius:14px; min-height:26px; padding:0 10px; font-size:12px}
+.chip.on{border-color:var(--foil); color:var(--ink); background:var(--foil-soft)}
+.newb{display:inline-block; font-size:10.5px; font-weight:600; color:#fff; background:#c0573f; border-radius:9px; padding:0 6px; margin-left:6px; line-height:1.7; vertical-align:1px}
+.gh{font-size:12.5px; color:var(--muted); margin:14px 14px 6px; border-bottom:1px solid var(--line); padding-bottom:3px}
+.bprog{height:3px; background:var(--line); border-radius:2px; overflow:hidden; margin:5px 0 0}
+.bprog i{display:block; height:100%; background:var(--foil)}
+.finb{font-size:10.5px; border-radius:9px; padding:0 6px; margin-left:6px; background:var(--cloth); color:var(--cloth-ink); line-height:1.7; vertical-align:1px}
+.lnk{border:0; background:none; color:var(--foil-text); font-size:12.5px; padding:4px 16px; text-align:left}
+
 /* 本棚の表示切り替えと表紙の並び */
 .shelfbar{position:sticky; top:-8px; z-index:2; display:flex; align-items:center; gap:8px; padding:8px 14px 8px; margin-top:-8px; background:var(--paper); border-bottom:1px solid var(--line)}
 .shelfbar .n{font-size:12px; color:var(--muted); margin-left:auto}
@@ -303,6 +364,7 @@ body.imm .stage{background:var(--desk)}
     <form id="unlockForm" hidden>
       <label class="f"><span>合言葉</span><input id="pass" type="password" required autocomplete="current-password"></label>
       <button class="go" id="unlockGo">開く</button>
+      <button type="button" class="go alt" id="bioGo" hidden>Face ID・Touch ID で開く</button>
       <button type="button" class="link" id="reset">この端末の設定を消して、最初から設定する</button>
     </form>
     <div class="msg" id="gateMsg" role="alert"></div>
@@ -311,7 +373,8 @@ body.imm .stage{background:var(--desk)}
 
 <header class="bar" id="bar" hidden>
   <div class="brand">書庫</div>
-  <input class="search" id="q" type="search" placeholder="書名・著者で探す" aria-label="書名・著者で探す">
+  <input class="search" id="q" type="search" placeholder="書名・著者で探す（Enter で本文も）" aria-label="書名・著者で探す。Enter で本文も探す" enterkeyhint="search">
+  <button class="hb" id="statsBtn" aria-pressed="false" title="読書の記録">記録</button>
   <button class="hb" id="nightBtn" aria-pressed="false" title="毎日23時の変換処理の結果">夜間<span class="lbl">処理</span></button>
   <button class="hb" id="manageBtn" aria-pressed="false" title="NAS の本の変換を管理する">変換<span class="lbl">管理</span></button>
   <button class="hb" id="reload" title="GitHub から読み直す">↻<span class="lbl"> 更新</span></button>
@@ -326,11 +389,13 @@ body.imm .stage{background:var(--desk)}
       <div class="seg" role="group" aria-label="組み方"><button data-wm="v">縦書き</button><button data-wm="h">横書き</button></div>
       <button class="tb" id="fsDown" aria-label="文字を小さく">A−</button>
       <button class="tb" id="fsUp" aria-label="文字を大きく">A＋</button>
-      <span class="sp"></span>
+      <button class="tb" id="tocBtn" aria-haspopup="dialog">目次</button>
+      <button class="tb" id="sumBtn" aria-haspopup="dialog" hidden>要約</button>
+      <div class="scrubw"><input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="ページを移動"><span class="scrubtip" id="scrubTip" hidden></span></div>
       <span class="pginfo" id="pgInfo" aria-live="polite"></span>
-      <span class="sp"></span>
       <button class="tb" id="bmHere" title="いま読んでいる所にしおりを挟む"><svg width="11" height="14" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg><span class="lbl">しおり</span></button>
       <button class="tb" id="bmGo" hidden aria-label="しおりへ移動"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 7h9M8 3l4 4-4 4"/></svg><span class="lbl">しおりへ</span></button>
+      <button class="tb" id="optBtn" aria-label="表示の設定" aria-haspopup="dialog"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.4"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg></button>
       <button class="tb" id="fullBtn"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg><span class="lbl" id="fullLbl">全画面</span></button>
     </div>
     <div class="stage" id="stage"><div class="empty">本棚から本と章を選んでください。</div></div>
@@ -358,6 +423,9 @@ body.imm .stage{background:var(--desk)}
   <div class="mlist" id="mlist"></div>
 </section>
 <section id="night" hidden aria-label="夜間処理の状況"></section>
+<section id="stats" class="panel" hidden aria-label="読書の記録"></section>
+<section id="search" class="panel" hidden aria-label="本文の検索"></section>
+<div class="pop" id="pop" role="dialog" hidden></div>
 <nav class="tabbar" id="tabbar" hidden>
   <button data-m="shelf" class="on">本棚</button>
   <button data-m="reader">本文</button>
@@ -494,6 +562,7 @@ body.imm .stage{background:var(--desk)}
     $("#manageBtn").setAttribute("aria-pressed", "false"); $("#nightBtn").setAttribute("aria-pressed", "false");
     document.body.classList.remove("full");
     $("#setupForm").hidden = has; $("#unlockForm").hidden = !has;
+    $("#bioGo").hidden = !(has && ls.get(BIO, null));
     $("#gateLead").textContent = has ? "合言葉を入れて本棚を開きます。" : "この端末で初めて開くための設定です。";
     $("#gateMsg").textContent = "";
     setTimeout(() => (has ? $("#pass") : $("#token")).focus(), 50);
@@ -532,12 +601,13 @@ body.imm .stage{background:var(--desk)}
 
   $("#reset").onclick = () => {
     const b = $("#reset");
-    if (b.dataset.armed) { ls.del(VAULT); delete b.dataset.armed; if ("caches" in window) caches.delete("shoko-data").catch(() => {}); b.textContent = "この端末の設定を消して、最初から設定する"; showGate(); return; }
+    if (b.dataset.armed) { ls.del(VAULT); ls.del(BIO); ls.del(RS_KEY); delete b.dataset.armed; if ("caches" in window) caches.delete("shoko-data").catch(() => {}); b.textContent = "この端末の設定を消して、最初から設定する"; showGate(); return; }
     b.dataset.armed = "1"; b.textContent = "もう一度押すと、この端末の設定を消します";
   };
 
   function lock() {
-    secret = null; dec = null; S.bundles.clear(); S.catalog = {}; S.books = []; S.cur = null; S.ch = null;
+    flushRS();
+    secret = null; S.sums = new Map(); S.meta = null; S.metaTried = false; dec = null; S.bundles.clear(); S.catalog = {}; S.books = []; S.cur = null; S.ch = null;
     $("#shelf").innerHTML = ""; $("#stage").innerHTML = '<div class="empty">本棚から本と章を選んでください。</div>'; $("#rtools").hidden = true; $("#pbar").hidden = true; L = null;
     showGate();
   }
@@ -551,8 +621,12 @@ body.imm .stage{background:var(--desk)}
     netState();
     if (location.hash === "#manage") return setPanel("manage");
     if (location.hash === "#night") return setPanel("night");
-    const last = ls.get(LAST, null);
-    if (last && S.catalog[last.bid] && !mobile()) openChapter(last.bid, last.no, true);
+    S.prevSeen = ls.get("shoko.seen", 0); ls.set("shoko.seen", Date.now());
+    syncPull().then(() => renderShelf());
+    const lr = lastReadBook();
+    if (lr && !mobile()) resumeBook(lr, true);
+    else { const last = ls.get(LAST, null); if (last && S.catalog[last.bid] && !mobile()) openChapter(last.bid, last.no, true); }
+    if (lr) setTimeout(() => prefetchBook(lr), 1500);
   }
 
   async function loadCatalog() {
@@ -634,46 +708,106 @@ body.imm .stage{background:var(--desk)}
     return (bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む${titleFor(b, bmCh.no) ? `（${esc(titleFor(b, bmCh.no))}）` : ""}</button>` : "")
       + ("caches" in window ? `<button class="keep${S.saved.has(b.id) ? " on" : ""}" data-keep="${esc(b.id)}">${S.saved.has(b.id) ? "✓ この端末に保存済み（押すと消す）" : "↓ この端末に保存（オフライン用）"}</button>` : "");
   }
+  // 本棚の絞り込み・並べ替え・分け方（この端末に保存）
+  S.shelfF = ls.get("shoko.shelff", "all"); S.shelfSort = ls.get("shoko.shelfsort", "recent"); S.shelfGroup = ls.get("shoko.shelfgroup", "none");
+  const stateOf = id => RS.fin[id]?.v ? "done" : RS.pos[id] ? "reading" : "unread";
+  const isNew = b => !!S.prevSeen && !RS.pos[b.id] && Date.parse(b.converted || "") > S.prevSeen;
+  function shelfList() {
+    const q = S.q.toLowerCase();
+    const list = S.books.filter(b => (!q || (b.title + " " + authorsOf(b)).toLowerCase().includes(q)) && (S.shelfF === "all" || stateOf(b.id) === S.shelfF));
+    const cmp = {
+      recent:(a, b) => (RS.pos[b.id]?.at || 0) - (RS.pos[a.id]?.at || 0) || String(b.converted || "").localeCompare(String(a.converted || "")),
+      added:(a, b) => String(b.converted || "").localeCompare(String(a.converted || "")),
+      title:(a, b) => String(a.title).localeCompare(String(b.title), "ja"),
+      author:(a, b) => authorsOf(a).localeCompare(authorsOf(b), "ja") || String(a.title).localeCompare(String(b.title), "ja"),
+    }[S.shelfSort] || (() => 0);
+    return list.sort(cmp);
+  }
+  function groupsOf(list) {
+    const g = S.shelfGroup, M = S.meta || {};
+    if (g === "none") return [["", list]];
+    const key = b => g === "author" ? [authorsOf(b) || "著者不明"]
+      : g === "series" ? [M[b.id]?.series || "シリーズなし"]
+      : g === "tag" ? ((M[b.id]?.tags || []).length ? M[b.id].tags : ["タグなし"])
+      : [String(b.type || "不明").toUpperCase()];
+    const map = new Map();
+    for (const b of list) for (const k of key(b)) { if (!map.has(k)) map.set(k, []); map.get(k).push(b); }
+    const last = /^(著者不明|シリーズなし|タグなし|不明)$/;
+    return [...map.entries()].sort((x, y) => (last.test(x[0]) - last.test(y[0])) || x[0].localeCompare(y[0], "ja"));
+  }
+  function shelfOpts() {
+    const cnt = { all:S.books.length, unread:0, reading:0, done:0 };
+    S.books.forEach(b => cnt[stateOf(b.id)]++);
+    const nNew = S.books.filter(isNew).length;
+    const sel = (id, label, cur, items) => `<select id="${id}" aria-label="${label}">${items.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${l}</option>`).join("")}</select>`;
+    return `<div class="shelfopts">${[["all","すべて"],["unread","未読"],["reading","読書中"],["done","読了"]].map(([k, l]) => `<button class="chip${S.shelfF === k ? " on" : ""}" data-sf="${k}">${l} ${cnt[k]}</button>`).join("")}</div>
+      <div class="shelfopts">${sel("shelfSort", "並べ替え", S.shelfSort, [["recent","最近読んだ順"],["added","追加した順"],["title","書名順"],["author","著者順"]])}
+      ${sel("shelfGroup", "分け方", S.shelfGroup, [["none","分けない"],["author","著者で分ける"],["series","シリーズで分ける"],["tag","タグで分ける"],["type","種類で分ける"]])}
+      ${nNew ? `<span class="newb" style="align-self:center">新着 ${nNew}</span>` : ""}</div>`;
+  }
+  const progOf = id => RS.fin[id]?.v ? 1 : (RS.pos[id]?.pct || 0);
+  function resumeBtn(b) {
+    const p = RS.pos[b.id]; if (!p || RS.fin[b.id]?.v) return "";
+    const t = titleFor(b, p.no);
+    return `<button class="resume" data-cont="${esc(b.id)}"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l6 4-6 4z" fill="var(--foil)"/></svg>続きから読む（${t ? esc(t) + "・" : ""}${Math.round((p.pct || 0) * 100)}%）</button>`;
+  }
+  const finBtn = b => `<button class="lnk" data-fin="${esc(b.id)}">${RS.fin[b.id]?.v ? "未読に戻す" : "読了にする"}</button>`;
+  const metaLine = b => `${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc((b.type || "").toUpperCase())}・${chapterGroups(b).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}${RS.fin[b.id]?.v ? '<span class="finb">読了</span>' : ""}`;
+  const progBar = b => progOf(b.id) ? `<span class="bprog" style="display:block"><i style="width:${Math.round(progOf(b.id) * 100)}%"></i></span>` : "";
   function renderShelf() {
-    const el = $("#shelf"), q = S.q.toLowerCase();
-    const list = S.books.filter(b => !q || (b.title + " " + authorsOf(b)).toLowerCase().includes(q));
+    const el = $("#shelf");
     if (!S.books.length) { el.innerHTML = '<div class="empty">まだ本がありません。Mac で epub2gh を実行すると、ここに並びます。</div>'; return; }
-    if (!list.length) { el.innerHTML = shelfBar(0) + '<div class="empty">見つかりませんでした。</div>'; return; }
+    const list = shelfList();
+    const head = shelfBar(list.length) + shelfOpts();
+    if (!list.length) { el.innerHTML = head + '<div class="empty">見つかりませんでした。</div>'; return; }
+    const groups = groupsOf(list), gh = k => k ? `<div class="gh">${esc(k)}（${groups.find(g => g[0] === k)[1].length}）</div>` : "";
     if (S.shelfView === "grid") {
       const gb = S.gridBook && S.catalog[S.gridBook] ? S.books.find(b => b.id === S.gridBook) : null;
       if (gb) {
         el.innerHTML = shelfBar(list.length) + `<div class="sdetail">
           <button class="sback" data-gback="1">‹ 表紙の一覧へ</button>
-          <div class="shead">${coverHTML(gb)}<div><div class="book-title">${esc(gb.title)}</div>
-            <div class="book-meta">${esc(authorsOf(gb))}${authorsOf(gb) ? "　" : ""}${esc((gb.type || "").toUpperCase())}・${(gb.chapters || []).length}章${S.saved.has(gb.id) ? '<span class="offl">保存済み</span>' : ""}</div></div></div>
-        </div><div class="book" style="border:0">${bookExtras(gb)}${chapterButtons(gb)}</div>`;
+          <div class="shead">${coverHTML(gb)}<div><div class="book-title">${esc(gb.title)}${isNew(gb) ? '<span class="newb">新着</span>' : ""}</div>
+            <div class="book-meta">${metaLine(gb)}</div>${progBar(gb)}</div></div>
+        </div><div class="book" style="border:0">${resumeBtn(gb)}${bookExtras(gb)}${finBtn(gb)}${chapterButtons(gb)}</div>`;
       } else {
-        el.innerHTML = shelfBar(list.length) + `<div class="sgrid">${list.map(b => {
-          const bm = S.bms[b.id], badges = (bm ? "<span>しおり</span>" : "") + (S.saved.has(b.id) ? "<span>保存済み</span>" : "");
+        el.innerHTML = head + groups.map(([k, bs]) => gh(k) + `<div class="sgrid">${bs.map(b => {
+          const badges = (isNew(b) ? '<span style="background:#c0573f;color:#fff">新着</span>' : "") + (RS.fin[b.id]?.v ? "<span>読了</span>" : "") + (S.saved.has(b.id) ? "<span>保存済み</span>" : "");
           return `<button class="scard${S.cur?.bid === b.id ? " cur" : ""}" data-gb="${esc(b.id)}" title="${esc(b.title)}">
-            ${coverHTML(b, badges ? `<span class="sbadge">${badges}</span>` : "")}
+            ${coverHTML(b, badges ? `<span class="sbadge">${badges}</span>` : "")}${progBar(b)}
             <span class="mct">${esc(b.title)}</span><span class="mca">${esc(authorsOf(b))}</span></button>`;
-        }).join("")}</div>`;
+        }).join("")}</div>`).join("");
       }
       watchThumbs(el, el);
       return;
     }
-    el.innerHTML = shelfBar(list.length) + list.map(b => {
-      const open = S.open.has(b.id) || S.cur?.bid === b.id, bm = S.bms[b.id];
-      const bmCh = bm && (b.chapters || []).find(c => c.no === bm.no);
+    el.innerHTML = head + groups.map(([k, bs]) => gh(k) + bs.map(b => {
+      const open = S.open.has(b.id) || S.cur?.bid === b.id;
       return `<div class="book">
         <button class="book-head" data-book="${esc(b.id)}" aria-expanded="${open}">
-          <div class="book-title">${esc(b.title)}</div>
-          <div class="book-meta">${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc((b.type || "").toUpperCase())}・${(b.chapters || []).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}</div>
+          <div class="book-title">${esc(b.title)}${isNew(b) ? '<span class="newb">新着</span>' : ""}</div>
+          <div class="book-meta">${metaLine(b)}</div>${progBar(b)}
         </button>
-        ${bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む${titleFor(b, bmCh.no) ? `（${esc(titleFor(b, bmCh.no))}）` : ""}</button>` : ""}
-        ${open && "caches" in window ? `<button class="keep${S.saved.has(b.id) ? " on" : ""}" data-keep="${esc(b.id)}">${S.saved.has(b.id) ? "✓ この端末に保存済み（押すと消す）" : "↓ この端末に保存（オフライン用）"}</button>` : ""}
-        ${open ? chapterButtons(b) : ""}
+        ${resumeBtn(b)}
+        ${open ? bookExtras(b) + finBtn(b) + chapterButtons(b) : ""}
       </div>`;
-    }).join("");
+    }).join("")).join("");
   }
   $("#q").addEventListener("input", e => { S.q = e.target.value.trim(); renderShelf(); });
+  $("#q").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.value.trim()) { e.preventDefault(); S.fq = e.target.value.trim(); setPanel("search"); } });
+  $("#shelf").addEventListener("change", e => {
+    if (e.target.id === "shelfSort") { S.shelfSort = e.target.value; ls.set("shoko.shelfsort", S.shelfSort); renderShelf(); }
+    if (e.target.id === "shelfGroup") {
+      S.shelfGroup = e.target.value; ls.set("shoko.shelfgroup", S.shelfGroup);
+      if ((S.shelfGroup === "series" || S.shelfGroup === "tag") && !S.metaTried) loadMeta().then(renderShelf); else renderShelf();
+    }
+  });
   $("#shelf").addEventListener("click", e => {
+    const sf = e.target.closest("[data-sf]");
+    if (sf) { S.shelfF = sf.dataset.sf; ls.set("shoko.shelff", S.shelfF); renderShelf(); return; }
+    const ct = e.target.closest("[data-cont]");
+    if (ct) return resumeBook(ct.dataset.cont);
+    const fn = e.target.closest("[data-fin]");
+    if (fn) { const id = fn.dataset.fin; RS.fin[id] = { v:!RS.fin[id]?.v, at:Date.now() }; saveRS(); renderShelf(); return; }
     const sv = e.target.closest("[data-sv]");
     if (sv) { if (sv.dataset.sv !== S.shelfView) { S.shelfView = sv.dataset.sv; ls.set("shoko.shelfview", S.shelfView); S.gridBook = null; renderShelf(); } return; }
     const gbk = e.target.closest("[data-gb]");
@@ -723,7 +857,8 @@ body.imm .stage{background:var(--desk)}
 
 
   async function openChapter(bid, no, quiet, then, atEnd) {
-    S.cur = { bid, no }; S.open.add(bid); renderShelf();
+    S.cur = { bid, no }; S.open.add(bid); renderShelf(); hidePop();
+    const sumReady = loadSummaries(bid).catch(() => null);
     if (mobile()) setMobile("reader");
     L = null; stage().innerHTML = '<div class="empty">本文を読み込み中…</div>';
     try {
@@ -735,6 +870,7 @@ body.imm .stage{background:var(--desk)}
       ls.set(LAST, { bid, no });
       S.anchor = null;
       updateImm();
+      await sumReady;
       layout(atEnd ? { last:true } : { page:0 });
       updateBmGo();
       if (then) then();
@@ -752,7 +888,7 @@ body.imm .stage{background:var(--desk)}
       const t = (m ? m[1] : b.text).replace(/\*\*|__/g, "");
       html += `<p class="blk${m ? " h" : ""}" data-id="${esc(b.id)}">${esc(t).replace(/\n/g, "<br>")}</p>`;
     }
-    return (isGenericTitle(ch.title) ? "" : `<h1 class="ctitle">${esc(ch.title)}</h1>`) + html;
+    return (isGenericTitle(ch.title) ? "" : `<h1 class="ctitle">${esc(ch.title)}</h1>`) + keyPoints(ch) + html;
   }
 
   // 置ける場所に合わせて A4 縦（1:√2）のページを決める。2枚並ぶ幅があれば見開き
@@ -891,6 +1027,7 @@ body.imm .stage{background:var(--desk)}
     const o = total != null && off != null ? off : 0, all = total != null && off != null ? total : L.pages;
     $("#pgInfo").textContent = last > p + 1 ? `${o + p + 1}–${o + last} / ${all}` : `${o + p + 1} / ${all}`;
     $("#pbarFill").style.width = ((o + last) / all * 100).toFixed(1) + "%";
+    afterShow(p, keep);
   }
 
   /* ---------- 本全体の通しページ番号 ----------
@@ -1119,7 +1256,7 @@ body.imm .stage{background:var(--desk)}
   $("#bmHere").onclick = () => {
     const a = L && anchorAt(); if (!a || !S.cur) return;
     S.bms[S.cur.bid] = { no:S.cur.no, block:a.block, off:a.off, at:Date.now() };
-    ls.set(BMS, S.bms); updateBmGo(); renderShelf();
+    ls.set(BMS, S.bms); RS.bms = S.bms; saveRS(); updateBmGo(); renderShelf();
     if (L) { L.bmPage = null; show(S.page, true); }
     status("しおりを挟みました（この端末に保存）。"); setTimeout(() => status(""), 2500);
   };
@@ -1140,20 +1277,26 @@ body.imm .stage{background:var(--desk)}
     if (name && S.full) setFull(false);
     document.body.classList.remove("imm", "chrome");
     $("#manage").hidden = name !== "manage"; $("#night").hidden = name !== "night";
-    $("#app").hidden = !!name; $("#tabbar").hidden = !!name; $("#q").hidden = !!name;
+    $("#stats").hidden = name !== "stats"; $("#search").hidden = name !== "search"; hidePop();
+    $("#app").hidden = !!name; $("#tabbar").hidden = !!name; $("#q").hidden = !!name && name !== "search";
     const back = '本棚へ<span class="lbl">戻る</span>';
     $("#manageBtn").setAttribute("aria-pressed", String(name === "manage"));
     $("#manageBtn").innerHTML = name === "manage" ? back : '変換<span class="lbl">管理</span>';
     $("#nightBtn").setAttribute("aria-pressed", String(name === "night"));
     $("#nightBtn").innerHTML = name === "night" ? back : '夜間<span class="lbl">処理</span>';
+    $("#statsBtn").setAttribute("aria-pressed", String(name === "stats"));
+    $("#statsBtn").innerHTML = name === "stats" ? back : "記録";
     try { history.replaceState(null, "", name ? "#" + name : location.pathname + location.search); } catch {}
     if (name === "manage") { if (!S.inv) loadManage(); else renderManage(); }
     else if (name === "night") loadNight();
+    else if (name === "stats") renderStats();
+    else if (name === "search") renderSearch();
     else { updateImm(); if (L) requestAnimationFrame(relayout); }
   }
   const setManage = on => setPanel(on ? "manage" : null);
   $("#manageBtn").onclick = () => setPanel(S.panel === "manage" ? null : "manage");
   $("#nightBtn").onclick = () => setPanel(S.panel === "night" ? null : "night");
+  $("#statsBtn").onclick = () => setPanel(S.panel === "stats" ? null : "stats");
 
   async function loadQueue() {
     let r;
@@ -1410,6 +1553,375 @@ body.imm .stage{background:var(--desk)}
     el.innerHTML = h;
   }
   $("#night").addEventListener("click", e => { const r = e.target.closest("[data-run]"); if (r) { N.sel = Number(r.dataset.run); renderNight(); } });
+
+  /* ================= 読書の記録（続きから・読了・読書時間）と端末間の同期 ================= */
+  const RS_KEY = "shoko.rstate", BIO = "shoko.bio", OPT = "shoko.opts";
+  const RS = Object.assign({ pos:{}, fin:{}, days:{}, bms:{} }, ls.get(RS_KEY, {}));
+  if (!Object.keys(RS.bms || {}).length && Object.keys(S.bms || {}).length) RS.bms = S.bms;   // 以前のしおりを引き継ぐ
+  S.bms = RS.bms;
+  const O = Object.assign({ anim:true, kp:true }, ls.get(OPT, {}));
+  const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const SY = { sha:null, timer:0, dirty:false, warned:false, busy:false };
+  function saveRS(soon) {
+    ls.set(RS_KEY, RS); ls.set(BMS, RS.bms);
+    SY.dirty = true;
+    clearTimeout(SY.timer); SY.timer = setTimeout(syncPush, soon ? 3000 : 90000);   // 書き込みは90秒にまとめて1回
+  }
+  function flushRS() { if (SY.dirty) syncPush(true); }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) flushRS(); });
+  addEventListener("pagehide", flushRS);
+  const newer = (a, b) => { const o = { ...(a || {}) }; for (const [k, v] of Object.entries(b || {})) if (!o[k] || (v?.at || 0) > (o[k]?.at || 0)) o[k] = v; return o; };
+  function mergeRS(r) {
+    RS.pos = newer(RS.pos, r.pos); RS.fin = newer(RS.fin, r.fin); RS.bms = newer(RS.bms, r.bms); S.bms = RS.bms;
+    const d = { ...(r.days || {}) };
+    for (const [k, v] of Object.entries(RS.days || {})) { const o = d[k] || {}; d[k] = { m:Math.max(o.m || 0, v.m || 0), p:Math.max(o.p || 0, v.p || 0) }; }
+    RS.days = d;
+    ls.set(RS_KEY, RS); ls.set(BMS, RS.bms);
+  }
+  const STATE_PATH = "reader/state.json.age";
+  async function syncPull() {
+    if (!secret || !navigator.onLine) return;
+    try {
+      const r = await fetch(apiURL(STATE_PATH), { cache:"no-store", headers:apiHeaders() });
+      if (r.status === 404) { SY.sha = null; if (Object.keys(RS.pos).length || Object.keys(RS.bms).length) saveRS(true); return; }
+      if (!r.ok) return;
+      const j = await r.json(); SY.sha = j.sha;
+      mergeRS(JSON.parse(await dec.decrypt(unb64(String(j.content || "").replace(/\s/g, "")), "text")));
+      updateBmGo?.();
+    } catch {}
+  }
+  async function syncPush(keepalive) {
+    clearTimeout(SY.timer);
+    const sec = secret;                            // 鍵をかける直前に呼ばれても送り切れるよう、ここで控える
+    if (!sec || !navigator.onLine || SY.busy) return;
+    SY.busy = true;
+    const url = `https://api.github.com/repos/${encodeURIComponent(sec.owner)}/${encodeURIComponent(sec.repo)}/contents/${STATE_PATH}`;
+    const hd = { Authorization:"Bearer " + sec.token, Accept:"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" };
+    try {
+      for (let tryNo = 0; tryNo < 2; tryNo++) {
+        const e = new AgeLib.Encrypter();
+        e.addRecipient(await AgeLib.identityToRecipient(sec.key));
+        const ct = await e.encrypt(JSON.stringify({ ...RS, at:Date.now() }));
+        const body = { message:"読書の記録を更新", content:b64big(ct) };
+        if (SY.sha) body.sha = SY.sha;
+        const r = await fetch(url, { method:"PUT", keepalive:!!keepalive && ct.length < 45000,
+          headers:{ ...hd, "Content-Type":"application/json" }, body:JSON.stringify(body) });
+        if (r.ok) { SY.sha = (await r.json()).content?.sha || null; SY.dirty = false; break; }
+        if (r.status === 409 || r.status === 422) { await syncPull(); continue; }      // 別の端末で更新されていた → まとめ直す
+        if ((r.status === 403 || r.status === 404) && !SY.warned) { SY.warned = true; status("読書の記録を同期できません（トークンの Contents を Read and write に）。この端末には残ります。"); setTimeout(() => status(""), 5000); }
+        break;
+      }
+    } catch {}
+    SY.busy = false;
+  }
+
+  // ページを表示したあとに呼ばれる：読み位置・読了・読んだページを記録
+  let posT = 0, lastAct = Date.now();
+  ["pointerdown", "keydown", "wheel", "touchstart"].forEach(t => addEventListener(t, () => { lastAct = Date.now(); }, { passive:true, capture:true }));
+  function afterShow(p, keep) {
+    if (!S.cur || !S.ch || !L) return;
+    if (!keep) {                                   // 自分でめくった
+      const k = ymd(new Date()), d = RS.days[k] || { m:0, p:0 };
+      RS.days[k] = { m:d.m || 0, p:(d.p || 0) + L.n };
+    }
+    updateScrub();
+    clearTimeout(posT);
+    posT = setTimeout(() => {
+      if (!L || !S.cur) return;
+      const a = anchorAt(); if (!a) return;
+      const off = bookOffset(), total = bookTotal(), last = Math.min(L.pages, S.page + L.n);
+      const pct = total ? Math.min(1, ((off ?? 0) + last) / total) : 0;
+      RS.pos[S.cur.bid] = { no:S.cur.no, block:a.block, off:a.off, pct:Math.round(pct * 1000) / 1000, at:Date.now() };
+      const chs = chaptersOf();
+      if (chs.length && S.ch.no === chs[chs.length - 1].no && last >= L.pages && !RS.fin[S.cur.bid]?.v) {
+        RS.fin[S.cur.bid] = { v:true, at:Date.now() };
+        status("この本を読み終えました。"); setTimeout(() => status(""), 3000);
+      }
+      saveRS(); renderShelfSoft();
+    }, 1200);
+  }
+  let shelfT = 0;
+  function renderShelfSoft() { clearTimeout(shelfT); shelfT = setTimeout(() => { if (!$("#shelf").matches(":hover")) renderShelf(); }, 800); }
+  // 読書時間：本文を開いて操作している間、30秒ごとに数える
+  setInterval(() => {
+    if (document.hidden || !S.ch || S.panel || Date.now() - lastAct > 120000) return;
+    const k = ymd(new Date()), d = RS.days[k] || { m:0, p:0 };
+    RS.days[k] = { m:Math.round(((d.m || 0) + .5) * 10) / 10, p:d.p || 0 };
+    ls.set(RS_KEY, RS); SY.dirty = true;
+  }, 30000);
+
+  function lastReadBook() {
+    let best = null;
+    for (const [bid, p] of Object.entries(RS.pos)) if (S.catalog[bid] && !RS.fin[bid]?.v && (!best || p.at > RS.pos[best].at)) best = bid;
+    return best;
+  }
+  // 1. 続きから読む
+  function resumeBook(bid, quiet) {
+    const p = RS.pos[bid], b = S.catalog[bid]; if (!b) return;
+    const no = p && (b.chapters || []).some(c => c.no === p.no) ? p.no : b.chapters?.[0]?.no;
+    if (no == null) return;
+    if (S.panel) setPanel(null);
+    openChapter(bid, no, quiet, p ? () => jump(p.block, true, p.off) : null);
+  }
+
+  /* ================= 30. 開くのを速く：前回の本を先に取り寄せておく ================= */
+  async function prefetchBook(bid) {
+    if (!secret || S.bundles.has(bid) || !navigator.onLine) return;
+    try { const run = () => loadBundle(bid).catch(() => {}); ("requestIdleCallback" in window) ? requestIdleCallback(run, { timeout:4000 }) : run(); } catch {}
+    loadSummaries(bid).catch(() => {});
+  }
+
+  /* ================= 小窓（目次・要約・設定） ================= */
+  function showPop(html, anchor) {
+    const p = $("#pop"); p.innerHTML = `<button class="x" data-px="1" aria-label="閉じる">×</button>` + html; p.hidden = false;
+    const r = anchor.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+    let left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
+    let top = r.bottom + 8; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+    p.style.left = left + "px"; p.style.top = top + "px";
+    clearTimeout(chromeT);                         // 小窓を開いている間は帯を隠さない
+  }
+  function hidePop() { const p = $("#pop"); if (p) { p.hidden = true; p.innerHTML = ""; } }
+  document.addEventListener("pointerdown", e => { const p = $("#pop"); if (!p.hidden && !p.contains(e.target) && !e.target.closest("#tocBtn,#sumBtn,#optBtn")) hidePop(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") hidePop(); });
+  $("#pop").addEventListener("click", e => {
+    if (e.target.closest("[data-px]")) return hidePop();
+    const t = e.target.closest("[data-toc]");
+    if (t) { hidePop(); return openChapter(S.cur.bid, Number(t.dataset.toc)); }
+    const r = e.target.closest("[data-ref]");
+    if (r) { hidePop(); return jump(r.dataset.ref); }
+    const o = e.target.closest("[data-opt]");
+    if (o) { const k = o.dataset.opt; O[k] = !O[k]; ls.set(OPT, O); o.setAttribute("aria-pressed", String(O[k])); o.textContent = O[k] ? "あり" : "なし"; if (k === "kp" && L) relayout(true); return; }
+    if (e.target.closest("[data-bioon]")) return bioSetup(e.target.closest("[data-bioon]"));
+    if (e.target.closest("[data-biooff]")) { ls.del(BIO); hidePop(); status("Face ID・Touch ID での解錠をやめました。"); setTimeout(() => status(""), 2500); }
+  });
+
+  // 5. 本文の中の目次
+  $("#tocBtn").onclick = e => {
+    if (!S.cur) return;
+    const b = S.catalog[S.cur.bid], groups = chapterGroups(b);
+    let o = 0; const start = new Map();
+    const known = PM.key === pmKey() && chaptersOf().every(c => PM.counts.has(c.no));
+    for (const c of chaptersOf()) { start.set(c.no, o + 1); o += PM.counts.get(c.no) || 0; }
+    showPop(`<h3>目次</h3><ul class="toc">${groups.map(g => `<li><button data-toc="${g.no}" class="${g.nos.includes(S.cur.no) ? "on" : ""}"><span>${esc(g.title)}</span>${known ? `<span class="pn">${start.get(g.no)}</span>` : ""}</button></li>`).join("")}</ul>`, e.currentTarget);
+    $("#pop .toc .on")?.scrollIntoView({ block:"center" });
+  };
+
+  // 4. ページの早送り
+  function bookPageToChapter(n) {
+    let o = 0;
+    for (const c of chaptersOf()) { const k = PM.counts.get(c.no) || 0; if (n < o + k) return { no:c.no, p:n - o }; o += k; }
+    const chs = chaptersOf(), lc = chs[chs.length - 1];
+    return { no:lc.no, p:(PM.counts.get(lc.no) || 1) - 1 };
+  }
+  function updateScrub() {
+    const sc = $("#scrub"); if (!sc || !L) return;
+    const total = bookTotal(), off = bookOffset();
+    const all = total ?? L.pages, cur = (total != null && off != null ? off : 0) + S.page;
+    sc.max = String(Math.max(0, all - 1)); if (!S.scrubbing) sc.value = String(cur);
+    sc.dir = S.vert ? "rtl" : "ltr";
+  }
+  $("#scrub").addEventListener("input", e => {
+    S.scrubbing = true; const n = Number(e.target.value), tip = $("#scrubTip");
+    const total = bookTotal();
+    let label = `${n + 1} ページ`;
+    if (total != null) { const t = bookPageToChapter(n), ct = titleFor(S.catalog[S.cur.bid], t.no); if (ct) label += `・${ct}`; }
+    tip.textContent = label; tip.hidden = false; clearTimeout(chromeT);
+  });
+  $("#scrub").addEventListener("change", e => {
+    S.scrubbing = false; $("#scrubTip").hidden = true;
+    const n = Number(e.target.value), total = bookTotal();
+    if (total == null) { show(n); return; }
+    const t = bookPageToChapter(n);
+    if (t.no === S.ch.no) show(t.p); else openChapter(S.cur.bid, t.no, true, () => show(t.p));
+    if (document.body.classList.contains("chrome")) setChrome(true);
+  });
+
+  // 6. めくりの演出（同じ章の中は紙面が滑り、章が変わるときはふわっと出る）
+  const _show = show;
+  show = function (p, keep) {
+    const sp = stage().querySelector(".spread");
+    if (sp && O.anim && !keep && L && !matchMedia("(prefers-reduced-motion:reduce)").matches) {
+      sp.classList.add("anim"); clearTimeout(sp._t); sp._t = setTimeout(() => sp.classList.remove("anim"), 380);
+    }
+    return _show(p, keep);
+  };
+  const _layout = layout;
+  layout = function (target) {
+    const r = _layout(target);
+    const sp = stage().querySelector(".spread");
+    if (sp && O.anim && target && !target.block && !matchMedia("(prefers-reduced-motion:reduce)").matches) { sp.classList.add("fadein"); setTimeout(() => sp.classList.remove("fadein"), 320); }
+    return r;
+  };
+
+  // 設定の小窓
+  $("#optBtn").onclick = e => {
+    const bioOk = !!(window.PublicKeyCredential && navigator.credentials && isSecureContext);
+    const yn = k => `<button class="tb" data-opt="${k}" aria-pressed="${O[k]}">${O[k] ? "あり" : "なし"}</button>`;
+    showPop(`<h3>表示の設定</h3>
+      <div class="optrow"><span class="lb">めくりの動き</span>${yn("anim")}</div>
+      <div class="optrow"><span class="lb">章の冒頭に要点<span class="note">要約がある章だけ</span></span>${yn("kp")}</div>
+      <div class="optrow"><span class="lb">Face ID・Touch ID で開く<span class="note">${bioOk ? (ls.get(BIO, null) ? "この端末で使えるようになっています" : "合言葉の代わりに使えます") : "この端末・ブラウザでは使えません"}</span></span>
+        ${bioOk ? (ls.get(BIO, null) ? '<button class="tb" data-biooff="1">やめる</button>' : '<button class="tb" data-bioon="1">設定する</button>') : ""}</div>
+      <div id="bioForm"></div>`, e.currentTarget);
+  };
+
+  /* ================= 20・21. 要約（claude.ai 版で作ったもの） ================= */
+  S.sums = new Map();
+  async function loadSummaries(bid) {
+    if (S.sums.has(bid)) return S.sums.get(bid);
+    let v = null;
+    try {
+      const r = await fetch(apiURL(`summaries/${encodeURIComponent(bid)}.json.age`), { headers:{ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
+      if (r.ok) v = JSON.parse(await dec.decrypt(new Uint8Array(await r.arrayBuffer()), "text"));
+    } catch {}
+    S.sums.set(bid, v);
+    if (S.cur?.bid === bid) $("#sumBtn").hidden = !v;
+    return v;
+  }
+  const sumOf = no => S.sums.get(S.cur?.bid)?.chapters?.[String(no)] || null;
+  function keyPoints(ch) {
+    if (!O.kp || !S.cur) return "";
+    const sm = S.sums.get(S.cur.bid)?.chapters?.[String(ch.no)];
+    const pts = (sm?.summary || []).slice(0, 3);
+    if (!pts.length) return "";
+    return `<div class="kp"><b>この章の要点</b><ol>${pts.map(p => `<li>${esc(p.text)}</li>`).join("")}</ol></div>`;
+  }
+  $("#sumBtn").onclick = e => {
+    const sm = sumOf(S.ch?.no), b = S.catalog[S.cur.bid];
+    const mm = n => !n ? "" : `<li><button class="nd${n === sm.mindmap ? " root" : ""}"${n.refs?.[0] ? ` data-ref="${esc(n.refs[0])}"` : ""}>${esc(n.label)}</button>${(n.children || []).length ? `<ul>${n.children.map(mm).join("")}</ul>` : ""}</li>`;
+    showPop(`<h3>${esc(titleFor(b, S.ch.no) || "この章")}の要約</h3>` + (sm ? `
+      <ol class="sumpts">${(sm.summary || []).map(p => `<li><button${p.refs?.[0] ? ` data-ref="${esc(p.refs[0])}"` : ""}>${esc(p.text)}</button></li>`).join("")}</ol>
+      ${sm.mindmap ? `<h3>マインドマップ</h3><div class="mm"><ul>${mm(sm.mindmap)}</ul></div>` : ""}
+      <p class="note" style="font-size:12px;color:var(--muted)">項目を押すと、本文のその段落へ移ります。</p>`
+      : `<p class="note">この章の要約はまだありません。claude.ai 版の書庫で要約を作り、「処理状況」から GitHub 版へ書き出すと出ます。</p>`), e.currentTarget);
+  };
+
+  /* ================= 18. Calibre のシリーズ・タグ（Mac が meta.json.age に置く） ================= */
+  async function loadMeta() {
+    S.metaTried = true;
+    try { S.meta = (await getJSON("meta.json.age")).books || {}; }
+    catch { S.meta = {}; status("シリーズ・タグの情報がまだありません。Mac で make_thumbs.py を実行すると作られます。"); setTimeout(() => status(""), 4000); }
+  }
+
+  /* ================= 14. 読書の記録 ================= */
+  function renderStats() {
+    const el = $("#stats"), now = new Date(), mp = ymd(now).slice(0, 7), days = RS.days || {};
+    let mMin = 0, mPg = 0, aMin = 0;
+    for (const [k, v] of Object.entries(days)) { aMin += v.m || 0; if (k.startsWith(mp)) { mMin += v.m || 0; mPg += v.p || 0; } }
+    let streak = 0; for (let d = new Date(now); streak < 3650; d.setDate(d.getDate() - 1)) { const v = days[ymd(d)]; if (v && (v.m >= 1 || v.p >= 1)) streak++; else if (ymd(d) !== ymd(now)) break; }
+    const fin = Object.entries(RS.fin).filter(([, v]) => v.v), finM = fin.filter(([, v]) => ymd(new Date(v.at)).startsWith(mp)).length;
+    const hm = m => m >= 60 ? `${Math.floor(m / 60)}時間${Math.round(m % 60)}分` : `${Math.round(m)}分`;
+    const start = new Date(now); start.setDate(start.getDate() - start.getDay() - 7 * 19);
+    let cells = "";
+    for (let i = 0; i < 140; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const v = days[ymd(d)], m = v?.m || 0, fut = d > now;
+      cells += `<i class="${fut ? "fut" : m >= 60 ? "l4" : m >= 30 ? "l3" : m >= 10 ? "l2" : m > 0 || v?.p ? "l1" : ""}" title="${d.getMonth() + 1}/${d.getDate()}　${hm(m)}・${v?.p || 0}ページ"></i>`;
+    }
+    const recent = fin.sort((a, b) => b[1].at - a[1].at).slice(0, 10);
+    el.innerHTML = `<h2>読書の記録</h2>
+      <div class="nmet">
+        <div class="nm"><div class="l">今月の読書時間</div><div class="v">${hm(mMin)}</div></div>
+        <div class="nm"><div class="l">今月めくったページ</div><div class="v">${mPg}</div></div>
+        <div class="nm"><div class="l">続けて読んだ日数</div><div class="v">${streak}日</div></div>
+        <div class="nm"><div class="l">読了（今月 / 全部）</div><div class="v">${finM} / ${fin.length}冊</div></div>
+      </div>
+      <h3>この20週間</h3><div class="heat" role="img" aria-label="日ごとの読書時間">${cells}</div>
+      <div class="legend">少ない <i style="background:var(--line)"></i><i style="background:rgba(169,130,42,.3)"></i><i style="background:rgba(169,130,42,.55)"></i><i style="background:rgba(169,130,42,.8)"></i><i style="background:var(--foil)"></i> 多い（10分・30分・60分で色が変わります）</div>
+      <h3>最近読み終えた本</h3><div class="nrows">${recent.map(([id, v]) => `<div class="nr"><span class="d">${esc(jdt(v.at))}</span><span class="ttl">${esc(S.catalog[id]?.title || id)}</span></div>`).join("") || '<div class="nr">まだありません。</div>'}</div>
+      <p class="note" style="font-size:12.5px;color:var(--muted);margin-top:14px">本文を開いて操作している時間を数えています（全部で ${hm(aMin)}）。記録は GitHub に暗号化して置き、ほかの端末と同期します。</p>`;
+  }
+
+  /* ================= 16. 本文の検索 ================= */
+  let searchTok = 0;
+  function renderSearch() {
+    const el = $("#search");
+    el.innerHTML = `<h2>本文の検索</h2><div class="srow"><input id="fq" type="search" placeholder="全部の本の本文から探す" value="${esc(S.fq || "")}" enterkeyhint="search"><button class="tb" id="fqGo">検索</button></div><div id="fres" class="note" style="font-size:13px;color:var(--muted)">全部の本を読み込んで探します。初めは少し時間がかかります。</div>`;
+    const go = () => { S.fq = $("#fq").value.trim(); if (S.fq) doSearch(S.fq); };
+    $("#fqGo").onclick = go;
+    $("#fq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+    if (S.fq) doSearch(S.fq); else $("#fq").focus();
+  }
+  async function doSearch(q) {
+    const out = $("#fres"), my = ++searchTok, ql = q.toLowerCase(), LIM = 300, hits = [];
+    const snip = (t, i) => { const a = Math.max(0, i - 36), z = Math.min(t.length, i + q.length + 64);
+      return (a > 0 ? "…" : "") + esc(t.slice(a, i)) + "<mark>" + esc(t.slice(i, i + q.length)) + "</mark>" + esc(t.slice(i + q.length, z)) + (z < t.length ? "…" : ""); };
+    let n = 0;
+    for (const b of S.books) {
+      if (my !== searchTok) return;
+      out.textContent = `検索中…（${++n}/${S.books.length}冊）`;
+      let bundle; try { bundle = await loadBundle(b.id); } catch { continue; }
+      if (my !== searchTok) return;
+      for (const ch of bundle.chapters || []) {
+        for (const blk of ch.blocks || []) {
+          const i = blk.text.toLowerCase().indexOf(ql);
+          if (i >= 0) hits.push({ b, no:ch.no, block:blk.id, off:i, ch:titleFor(b, ch.no) || "冒頭", html:snip(blk.text, i) });
+          if (hits.length >= LIM) break;
+        }
+        if (hits.length >= LIM) break;
+      }
+      if (hits.length >= LIM) break;
+    }
+    if (my !== searchTok) return;
+    if (!hits.length) { out.innerHTML = `「${esc(q)}」は見つかりませんでした。`; return; }
+    let h = `<div style="margin-bottom:4px">${hits.length >= LIM ? LIM + "件以上" : hits.length + "件"}見つかりました。</div>`, last = null;
+    hits.forEach((x, k) => { if (x.b !== last) { h += `<div class="hit-b">${esc(x.b.title)}</div>`; last = x.b; } h += `<button class="hit" data-hit="${k}"><span class="hc">${esc(x.ch)}</span><br>${x.html}</button>`; });
+    out.innerHTML = h; out.style.color = "var(--ink)";
+    out.onclick = e => {
+      const t = e.target.closest("[data-hit]"); if (!t) return;
+      const x = hits[Number(t.dataset.hit)];
+      setPanel(null);
+      openChapter(x.b.id, x.no, false, () => jump(x.block, false, x.off));
+    };
+  }
+
+  /* ================= 28. Face ID・Touch ID（WebAuthn の PRF で合言葉を包む） ================= */
+  const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+  const b64u = u => btoa(String.fromCharCode(...new Uint8Array(u)));
+  async function prfKey(out) { return crypto.subtle.importKey("raw", new Uint8Array(out).slice(0, 32), "AES-GCM", false, ["encrypt", "decrypt"]); }
+  async function prfGet(idB64, salt) {
+    const a = await navigator.credentials.get({ publicKey:{ challenge:rnd(32), rpId:location.hostname, userVerification:"required",
+      allowCredentials:[{ type:"public-key", id:unb64(idB64) }], extensions:{ prf:{ eval:{ first:salt } } }, timeout:60000 } });
+    const res = a.getClientExtensionResults()?.prf?.results?.first;
+    if (!res) throw new Error("この端末では Face ID・Touch ID での解錠に対応していません。");
+    return res;
+  }
+  function bioSetup(btn) {
+    const f = $("#bioForm");
+    f.innerHTML = `<div class="optrow" style="flex-wrap:wrap"><label style="flex:1 1 100%;font-size:13px">確認のため、いまの合言葉を入れてください
+      <input id="bioPass" type="password" autocomplete="current-password" style="width:100%;margin-top:4px;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:15px"></label>
+      <button class="tb" id="bioDo" style="margin-top:8px">登録する</button><span id="bioMsg" style="font-size:12.5px;color:var(--danger);flex:1 1 100%"></span></div>`;
+    $("#bioPass").focus();
+    $("#bioDo").onclick = async () => {
+      const pass = $("#bioPass").value, msg = $("#bioMsg");
+      try { await unseal(ls.get(VAULT), pass); } catch { msg.textContent = "合言葉が違います。"; return; }
+      try {
+        const salt = rnd(32);
+        const cred = await navigator.credentials.create({ publicKey:{
+          rp:{ name:"書庫", id:location.hostname }, user:{ id:rnd(16), name:"shoko", displayName:"書庫" }, challenge:rnd(32),
+          pubKeyCredParams:[{ type:"public-key", alg:-7 }, { type:"public-key", alg:-257 }],
+          authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required", residentKey:"preferred" },
+          extensions:{ prf:{ eval:{ first:salt } } }, timeout:60000 } });
+        const ext = cred.getClientExtensionResults()?.prf;
+        if (ext && ext.enabled === false) throw new Error("この端末では Face ID・Touch ID での解錠に対応していません。");
+        const id = b64u(cred.rawId);
+        const out = ext?.results?.first || await prfGet(id, salt);
+        const iv = rnd(12), ct = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, await prfKey(out), te.encode(pass));
+        ls.set(BIO, { id, salt:b64u(salt), iv:b64u(iv), ct:b64u(ct) });
+        hidePop(); status("登録しました。次からは Face ID・Touch ID で開けます。"); setTimeout(() => status(""), 3000);
+      } catch (e) { msg.textContent = e?.name === "NotAllowedError" ? "取り消されました。" : (e.message || "登録できませんでした。"); }
+    };
+  }
+  $("#bioGo").onclick = async () => {
+    const msg = $("#gateMsg"), v = ls.get(BIO, null); if (!v) return;
+    msg.textContent = "";
+    try {
+      const out = await prfGet(v.id, unb64(v.salt));
+      const pass = new TextDecoder().decode(await crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(v.iv) }, await prfKey(out), unb64(v.ct)));
+      const sec = await unseal(ls.get(VAULT), pass);
+      start(sec, makeDecrypter(sec.key), null);
+    } catch (e) { msg.textContent = e?.name === "NotAllowedError" ? "取り消されました。合言葉でも開けます。" : (e.message || "開けませんでした。合言葉で開いてください。"); }
+  };
 
   /* ---------- スマホのタブ ---------- */
   function setMobile(m) {
