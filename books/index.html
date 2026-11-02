@@ -219,6 +219,22 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 .ntail{font:12px/1.6 ui-monospace,Menlo,monospace; background:var(--sheet); border:1px solid var(--line); border-radius:6px; padding:10px 12px; white-space:pre-wrap; word-break:break-all; max-height:260px; overflow:auto}
 .nnote{font-size:13px; color:var(--muted); line-height:1.75; background:var(--sheet); border:1px dashed var(--line); border-radius:8px; padding:10px 14px; margin-top:12px}
 .nnote code{font-size:12px}
+/* 本棚の表示切り替えと表紙の並び */
+.shelfbar{position:sticky; top:-8px; z-index:2; display:flex; align-items:center; gap:8px; padding:8px 14px 8px; margin-top:-8px; background:var(--paper); border-bottom:1px solid var(--line)}
+.shelfbar .n{font-size:12px; color:var(--muted); margin-left:auto}
+.sgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:16px 12px; padding:12px 14px 8px}
+.scard{display:flex; flex-direction:column; gap:4px; border:0; background:none; padding:0; text-align:left; color:var(--ink); cursor:pointer; min-width:0}
+.scard .mcover{width:100%}
+.scard.cur .mcover{outline:3px solid var(--foil); outline-offset:2px}
+.sbadge{position:absolute; right:5px; bottom:5px; z-index:2; display:flex; gap:4px}
+.sbadge span{font-size:10.5px; border-radius:9px; padding:0 6px; line-height:1.7; background:rgba(255,255,255,.92); color:#3a3a3a; box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sdetail{padding:12px 14px 4px}
+.sback{border:0; background:none; color:var(--foil-text); font-size:13px; padding:4px 0; margin-bottom:8px; cursor:pointer}
+.shead{display:grid; grid-template-columns:84px minmax(0,1fr); gap:12px; align-items:start; margin-bottom:10px}
+.shead .mcover{width:84px}
+.shead .book-title{margin:2px 0 4px}
+@media (max-width:820px){ .sgrid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))} }
+
 /* サムネイル表示 */
 .mgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:20px 16px; padding:6px 0 10px}
 .mcard{position:relative; display:flex; flex-direction:column; gap:5px; cursor:pointer; min-width:0}
@@ -570,12 +586,47 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 
   /* ---------- 本棚 ---------- */
   const authorsOf = b => (b.authors || []).join(" / ");
+  S.shelfView = ls.get("shoko.shelfview", "list"); S.gridBook = null;
+  function shelfBar(n) {
+    return `<div class="shelfbar"><div class="seg" role="group" aria-label="本棚の表示">
+      <button data-sv="list" class="${S.shelfView === "list" ? "on" : ""}">一覧</button>
+      <button data-sv="grid" class="${S.shelfView === "grid" ? "on" : ""}">表紙</button></div><span class="n">${n}冊</span></div>`;
+  }
+  const coverHTML = (b, extra = "") => `<span class="mcover" style="--h:${hashHue(b.title)}" data-thumb="${esc(b.id)}">
+      <span class="ph" aria-hidden="true"><b>${esc(b.title)}</b><i>${esc(authorsOf(b) || String(b.type || "").toUpperCase())}</i></span>${extra}</span>`;
+  function chapterButtons(b) {
+    return (b.chapters || []).map(c => `<button class="ch${S.cur?.bid === b.id && S.cur?.no === c.no ? " on" : ""}" data-bid="${esc(b.id)}" data-no="${c.no}">${esc(c.title)}</button>`).join("");
+  }
+  function bookExtras(b) {
+    const bm = S.bms[b.id], bmCh = bm && (b.chapters || []).find(c => c.no === bm.no);
+    return (bmCh ? `<button class="resume" data-resume="${esc(b.id)}"><svg width="10" height="13" viewBox="0 0 12 16" aria-hidden="true"><path d="M1 1h10v14L6 11 1 15z" fill="var(--foil)"/></svg>しおりから読む（${esc(bmCh.title)}）</button>` : "")
+      + ("caches" in window ? `<button class="keep${S.saved.has(b.id) ? " on" : ""}" data-keep="${esc(b.id)}">${S.saved.has(b.id) ? "✓ この端末に保存済み（押すと消す）" : "↓ この端末に保存（オフライン用）"}</button>` : "");
+  }
   function renderShelf() {
     const el = $("#shelf"), q = S.q.toLowerCase();
     const list = S.books.filter(b => !q || (b.title + " " + authorsOf(b)).toLowerCase().includes(q));
     if (!S.books.length) { el.innerHTML = '<div class="empty">まだ本がありません。Mac で epub2gh を実行すると、ここに並びます。</div>'; return; }
-    if (!list.length) { el.innerHTML = '<div class="empty">見つかりませんでした。</div>'; return; }
-    el.innerHTML = list.map(b => {
+    if (!list.length) { el.innerHTML = shelfBar(0) + '<div class="empty">見つかりませんでした。</div>'; return; }
+    if (S.shelfView === "grid") {
+      const gb = S.gridBook && S.catalog[S.gridBook] ? S.books.find(b => b.id === S.gridBook) : null;
+      if (gb) {
+        el.innerHTML = shelfBar(list.length) + `<div class="sdetail">
+          <button class="sback" data-gback="1">‹ 表紙の一覧へ</button>
+          <div class="shead">${coverHTML(gb)}<div><div class="book-title">${esc(gb.title)}</div>
+            <div class="book-meta">${esc(authorsOf(gb))}${authorsOf(gb) ? "　" : ""}${esc((gb.type || "").toUpperCase())}・${(gb.chapters || []).length}章${S.saved.has(gb.id) ? '<span class="offl">保存済み</span>' : ""}</div></div></div>
+        </div><div class="book" style="border:0">${bookExtras(gb)}${chapterButtons(gb)}</div>`;
+      } else {
+        el.innerHTML = shelfBar(list.length) + `<div class="sgrid">${list.map(b => {
+          const bm = S.bms[b.id], badges = (bm ? "<span>しおり</span>" : "") + (S.saved.has(b.id) ? "<span>保存済み</span>" : "");
+          return `<button class="scard${S.cur?.bid === b.id ? " cur" : ""}" data-gb="${esc(b.id)}" title="${esc(b.title)}">
+            ${coverHTML(b, badges ? `<span class="sbadge">${badges}</span>` : "")}
+            <span class="mct">${esc(b.title)}</span><span class="mca">${esc(authorsOf(b))}</span></button>`;
+        }).join("")}</div>`;
+      }
+      watchThumbs(el, el);
+      return;
+    }
+    el.innerHTML = shelfBar(list.length) + list.map(b => {
       const open = S.open.has(b.id) || S.cur?.bid === b.id, bm = S.bms[b.id];
       const bmCh = bm && (b.chapters || []).find(c => c.no === bm.no);
       return `<div class="book">
@@ -591,12 +642,17 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
   }
   $("#q").addEventListener("input", e => { S.q = e.target.value.trim(); renderShelf(); });
   $("#shelf").addEventListener("click", e => {
+    const sv = e.target.closest("[data-sv]");
+    if (sv) { if (sv.dataset.sv !== S.shelfView) { S.shelfView = sv.dataset.sv; ls.set("shoko.shelfview", S.shelfView); S.gridBook = null; renderShelf(); } return; }
+    const gbk = e.target.closest("[data-gb]");
+    if (gbk) { S.gridBook = gbk.dataset.gb; renderShelf(); $("#shelf").scrollTop = 0; return; }
+    if (e.target.closest("[data-gback]")) { S.gridBook = null; renderShelf(); return; }
     const k = e.target.closest("[data-keep]");
     if (k) return toggleKeep(k.dataset.keep);
     const h = e.target.closest("[data-book]");
     if (h) { const id = h.dataset.book; S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderShelf(); return; }
     const r = e.target.closest("[data-resume]");
-    if (r) { const bm = S.bms[r.dataset.resume]; return openChapter(r.dataset.resume, bm.no, false, () => jump(bm.block)); }
+    if (r) { const bm = S.bms[r.dataset.resume]; return openChapter(r.dataset.resume, bm.no, false, () => jump(bm.block, false, bm.off)); }
     const c = e.target.closest("[data-bid]");
     if (c) openChapter(c.dataset.bid, Number(c.dataset.no));
   });
@@ -1169,7 +1225,7 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
 
   /* ---------- 表紙のサムネイル（Mac が thumbs/<本のID>.jpg.age として暗号化して置く） ---------- */
   const hashHue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return h % 360; };
-  const TH = { urls:new Map(), none:new Set(), queue:[], busy:0, io:null };
+  const TH = { urls:new Map(), none:new Set(), queue:[], busy:0 };
   async function fetchThumb(bid) {
     const url = apiURL(`thumbs/${encodeURIComponent(bid)}.jpg.age`);
     const r = await fetch(url, { headers:{ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
@@ -1197,17 +1253,18 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
       }).catch(() => {}).finally(() => { TH.busy--; pumpThumbs(); });
     }
   }
-  function watchThumbs() {
-    TH.io?.disconnect();
-    TH.queue = [];
-    const els = [...document.querySelectorAll("#mlist [data-thumb]")];
+  const IOS = new Map();       // 画面（本棚・変換管理）ごとの見張り
+  function watchThumbs(box = $("#mlist"), root = $("#manage")) {
+    IOS.get(root)?.disconnect();
+    const els = [...box.querySelectorAll("[data-thumb]")];
     const want = el => { const bid = el.dataset.thumb; if (TH.urls.has(bid)) putThumb(el, TH.urls.get(bid)); else if (!TH.none.has(bid)) TH.queue.push(el); };
     if (!("IntersectionObserver" in window)) { els.forEach(want); return pumpThumbs(); }
-    TH.io = new IntersectionObserver(ents => {
-      for (const en of ents) if (en.isIntersecting) { TH.io.unobserve(en.target); want(en.target); }
+    const io = new IntersectionObserver(ents => {
+      for (const en of ents) if (en.isIntersecting) { io.unobserve(en.target); want(en.target); }
       pumpThumbs();
-    }, { root:$("#manage"), rootMargin:"400px 0px" });
-    els.forEach(el => TH.io.observe(el));
+    }, { root, rootMargin:"400px 0px" });
+    IOS.set(root, io);
+    els.forEach(el => io.observe(el));
   }
 
   $("#mAdd").onclick = () => changeQueue(true);
