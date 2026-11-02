@@ -290,7 +290,19 @@ body.full .seg button.on{background:var(--bunko); color:var(--cloth)}
         Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
     } catch { throw new Error("GitHub につながりませんでした。通信状況を確認してください。"); }
     if (r.status === 401) throw new Error("トークンが無効か、期限切れです。");
-    if (r.status === 404) throw new Error("見つかりません（ユーザー名・リポジトリ名、トークンの対象リポジトリを確認）。");
+    if (r.status === 404) {
+      // リポジトリ自体は見えるのか、ファイルが無いだけなのかを切り分ける
+      let repoOk = false;
+      try {
+        const rr = await fetch(`https://api.github.com/repos/${encodeURIComponent(sec.owner)}/${encodeURIComponent(sec.repo)}`,
+          { cache:"no-store", headers:{ Authorization:"Bearer " + sec.token, "X-GitHub-Api-Version":"2022-11-28" } });
+        repoOk = rr.ok;
+      } catch {}
+      if (repoOk && path === "index.json.age")
+        throw new Error("リポジトリには接続できましたが、本の一覧（index.json.age）がまだありません。Mac で epub2gh を --no-push なしで実行して、GitHub に送ってください。");
+      if (repoOk) throw new Error("見つかりません: " + path);
+      throw new Error("リポジトリが見つかりません（ユーザー名・リポジトリ名、トークンの対象リポジトリを確認）。");
+    }
     if (r.status === 403 || r.status === 429) throw new Error("GitHub の利用制限にかかりました。しばらくしてから試してください。");
     if (!r.ok) throw new Error("GitHub からの読み込みに失敗しました（" + r.status + "）。");
     return new Uint8Array(await r.arrayBuffer());
