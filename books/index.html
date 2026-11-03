@@ -67,6 +67,7 @@ button{cursor:pointer}
 .search{flex:1; max-width:320px; margin-left:auto; border:1px solid rgba(255,255,255,.3); background:rgba(255,255,255,.08); color:var(--cloth-ink); border-radius:6px; padding:6px 10px; font-size:13.5px}
 .search::placeholder{color:rgba(233,236,244,.65)}
 .hb{border:1px solid rgba(255,255,255,.35); background:transparent; color:var(--cloth-ink); border-radius:6px; min-height:32px; padding:0 11px; font-size:13px}
+a.hb{display:inline-flex; align-items:center; text-decoration:none}
 .status{font-size:12px; color:var(--muted); padding:4px 16px; min-height:0}
 .status:empty{display:none}
 
@@ -462,6 +463,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   <button class="hb" id="statsBtn" aria-pressed="false" title="読書の記録">記録</button>
   <button class="hb" id="nightBtn" aria-pressed="false" title="毎日23時の変換処理の結果">夜間<span class="lbl">処理</span></button>
   <button class="hb" id="manageBtn" aria-pressed="false" title="NAS の本の変換を管理する">変換<span class="lbl">管理</span></button>
+  <a class="hb" id="uploadBtn" href="upload.html" title="写真や PDF から本を登録する">登録</a>
   <button class="hb" id="reload" title="GitHub から読み直す">↻<span class="lbl"> 更新</span></button>
   <button class="hb" id="lock" title="鍵をかける">🔒<span class="lbl"> 鍵</span></button>
 </header>
@@ -566,6 +568,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   "use strict";
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const typeLabel = t => t === "image" ? "画像" : String(t || "").toUpperCase();   // 写真・PDF から作った本は「画像」
   const mobile = () => matchMedia("(max-width:820px)").matches;
   const reduced = () => matchMedia("(prefers-reduced-motion:reduce)").matches;
   const status = t => { const s = $("#status"); s.textContent = t || ""; s.hidden = !t; };
@@ -771,7 +774,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       <button data-sv="grid" class="${S.shelfView === "grid" ? "on" : ""}">表紙</button></div><span class="n">${n}冊</span></div>`;
   }
   const coverHTML = (b, extra = "") => `<span class="mcover" style="--h:${hashHue(b.title)}" data-thumb="${esc(b.id)}">
-      <span class="ph" aria-hidden="true"><b>${esc(b.title)}</b><i>${esc(authorsOf(b) || String(b.type || "").toUpperCase())}</i></span>${extra}</span>`;
+      <span class="ph" aria-hidden="true"><b>${esc(b.title)}</b><i>${esc(authorsOf(b) || typeLabel(b.type))}</i></span>${extra}</span>`;
   /* ---------- 「part19」のような仮の章名 ----------
      EPUB の中のファイル名がそのまま章名になったもの。目次には出さず、直前の見出しの続きとして扱う */
   const GENERIC_CH = /^\s*(?:part|chapter|chap|ch|section|sec|text|page|index|p|c|split|toc|cover|titlepage)[\s._-]*\d+(?:[\s._-]*(?:split)?[\s._-]*\d+)*\s*$/i;
@@ -818,7 +821,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     const key = b => g === "author" ? [authorsOf(b) || "著者不明"]
       : g === "series" ? [M[b.id]?.series || "シリーズなし"]
       : g === "tag" ? ((M[b.id]?.tags || []).length ? M[b.id].tags : ["タグなし"])
-      : [String(b.type || "不明").toUpperCase()];
+      : [typeLabel(b.type || "不明")];
     const map = new Map();
     for (const b of list) for (const k of key(b)) { if (!map.has(k)) map.set(k, []); map.get(k).push(b); }
     const last = /^(著者不明|シリーズなし|タグなし|不明)$/;
@@ -858,7 +861,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     S.acc[d.dataset.acck] = d.open; ls.set("shoko.acc", S.acc);
   }, true);
   const finBtn = b => `<button class="lnk" data-fin="${esc(b.id)}">${RS.fin[b.id]?.v ? "未読に戻す" : "読了にする"}</button>`;
-  const metaLine = b => `${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc((b.type || "").toUpperCase())}・${chapterGroups(b).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}${RS.fin[b.id]?.v ? '<span class="finb">読了</span>' : ""}`;
+  const metaLine = b => `${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc(typeLabel(b.type))}・${chapterGroups(b).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}${RS.fin[b.id]?.v ? '<span class="finb">読了</span>' : ""}`;
   const progBar = b => progOf(b.id) ? `<span class="bprog" style="display:block"><i style="width:${Math.round(progOf(b.id) * 100)}%"></i></span>` : "";
   function renderShelf() {
     const el = $("#shelf");
@@ -1515,10 +1518,10 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
           <input type="checkbox" data-mb="${esc(b.bid)}"${on ? " checked" : ""}${st === "done" ? " disabled" : ""} aria-label="${esc(b.title)}を選ぶ">
           <span class="mst ${st}">${label}</span>
           <span class="mcover" style="--h:${hashHue(b.title)}" data-thumb="${esc(b.bid)}">
-            <span class="ph" aria-hidden="true"><b>${esc(b.title)}</b><i>${esc(au || String(b.type || "").toUpperCase())}</i></span>
+            <span class="ph" aria-hidden="true"><b>${esc(b.title)}</b><i>${esc(au || typeLabel(b.type))}</i></span>
           </span>
           <span class="mct">${esc(b.title)}</span>
-          <span class="mca">${esc(au)}${au ? "　" : ""}${esc(String(b.type || "").toUpperCase())}</span>
+          <span class="mca">${esc(au)}${au ? "　" : ""}${esc(typeLabel(b.type))}</span>
         </label>`;
       }).join("")}</div>` + more;
       watchThumbs();
@@ -1530,7 +1533,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       const label = st === "queue" ? `変換待ち ${qpos.get(b.bid) + 1}番目` : ST_LABEL[st];
       return `<label class="mrow">
         <input type="checkbox" data-mb="${esc(b.bid)}"${on ? " checked" : ""}${st === "done" ? " disabled" : ""} aria-label="${esc(b.title)}を選ぶ">
-        <span><span class="mt">${esc(b.title)}</span><br><span class="mm">${esc((b.authors || []).join(" / "))}${(b.authors || []).length ? "　" : ""}${esc(String(b.type || "").toUpperCase())}${b.added ? "・" + esc(b.added) + " 追加" : ""}</span></span>
+        <span><span class="mt">${esc(b.title)}</span><br><span class="mm">${esc((b.authors || []).join(" / "))}${(b.authors || []).length ? "　" : ""}${esc(typeLabel(b.type))}${b.added ? "・" + esc(b.added) + " 追加" : ""}</span></span>
         <span class="mst ${st}">${label}</span>
       </label>`;
     }).join("") + (list.length > shown.length ? `<button class="mmore" id="mMore">さらに表示（残り ${list.length - shown.length} 冊）</button>` : "");
