@@ -267,6 +267,20 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 .kp{border:1px solid var(--bunko-rule); border-radius:4px; padding:.7em .9em; margin-block:0 1.4em; font-family:var(--sans); font-size:.86em; line-height:1.75; break-inside:avoid}
 .kp b{display:block; font-size:.9em; color:var(--bunko-muted); margin-block-end:.3em}
 .kp ol{margin:0; padding-inline-start:1.3em}
+/* スクロール表示 */
+.scroller{position:relative; flex:none; width:100%; height:100%; overflow:auto; background:var(--desk); overscroll-behavior:contain; scrollbar-width:thin; -webkit-overflow-scrolling:touch; outline:none}
+.scroller.h{touch-action:pan-y}
+.scroller.v{writing-mode:vertical-rl; touch-action:pan-x; background:var(--bunko)}
+#reader .flow.sc{columns:auto; column-width:auto; column-gap:0; width:auto; height:auto; box-sizing:border-box; background:var(--bunko); color:var(--bunko-ink); font-family:var(--serif); font-size:var(--fs); line-height:1.9}
+.scroller.h .flow.sc{width:min(100%,40em); margin:0 auto; min-height:100%; padding:calc(env(safe-area-inset-top,0px) + 40px) var(--spx) 120px; box-shadow:0 0 0 1px var(--bunko-rule)}
+.scroller.v .flow.sc{writing-mode:vertical-rl; line-height:1.8; margin-inline:auto; padding-inline:var(--spx); padding-block:48px 120px}
+.chs + .chs{margin-block-start:3.2em}
+.scroller .fig{max-width:100%}
+.blk.bmk{box-shadow:inset 3px 0 0 var(--foil)}
+.vert .blk.bmk{box-shadow:inset -3px 0 0 var(--foil)}
+#modeBtn[aria-pressed="true"]{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth)}
+#modeBtn[aria-pressed="true"] svg{stroke:var(--cloth-ink)}
+
 /* アコーディオン（目次・記録） */
 details.acc{border-top:1px solid var(--line)}
 details.acc > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:6px; padding:8px 4px; font-size:13px; font-weight:600; color:var(--ink)}
@@ -458,6 +472,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   <article id="reader">
     <div class="rtools" id="rtools" hidden>
       <div class="seg" role="group" aria-label="組み方"><button data-wm="v">縦書き</button><button data-wm="h">横書き</button></div>
+      <button class="tb" id="modeBtn" aria-pressed="false" title="ページをめくる／スクロールで読む"><svg width="12" height="14" viewBox="0 0 12 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 1v14M2.5 11.5L6 15l3.5-3.5M2.5 4.5L6 1l3.5 3.5"/></svg><span class="lbl">スクロール</span></button>
       <button class="tb" id="fsDown" aria-label="文字を小さく">A−</button>
       <button class="tb" id="fsUp" aria-label="文字を大きく">A＋</button>
       <button class="tb" id="tocBtn" aria-haspopup="dialog">目次</button>
@@ -564,8 +579,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   let secret = null, dec = null;      // 鍵を開けている間だけメモリに置く
   const S = { catalog:{}, books:[], bundles:new Map(), cur:null, ch:null, open:new Set(), q:"",
               vert:true, fs:16.5, full:false, bms: ls.get(BMS, {}), saved:new Set() };
-  const p = ls.get(PREFS, {}); if (typeof p.vert === "boolean") S.vert = p.vert; if (p.fs) S.fs = p.fs;
-  const savePrefs = () => ls.set(PREFS, { vert:S.vert, fs:S.fs });
+  const p = ls.get(PREFS, {}); if (typeof p.vert === "boolean") S.vert = p.vert; if (p.fs) S.fs = p.fs; if (typeof p.scroll === "boolean") S.scroll = p.scroll;
+  const savePrefs = () => ls.set(PREFS, { vert:S.vert, fs:S.fs, scroll:!!S.scroll });
 
   /* ---------- 合言葉で鍵とトークンを守る ---------- */
   const te = new TextEncoder(), td = new TextDecoder();
@@ -950,6 +965,14 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
 
   async function openChapter(bid, no, quiet, then, atEnd) {
+    // スクロール表示で同じ本の別の章へ：組み直さず、その章の頭へ動くだけ
+    if (S.scroll && L?.scroll && L.bid === bid && L.flows[0].querySelector(`.chs[data-no="${no}"]`)) {
+      hidePop(); if (mobile()) setMobile("reader");
+      atEnd ? scrollToChapterEnd(no) : scrollToChapterStart(no);
+      SC.last = scPos(); scrollSync(true);
+      if (then) then();
+      return;
+    }
     S.cur = { bid, no }; S.open.add(bid); renderShelf(); hidePop();
     const sumReady = Promise.all([loadSummaries(bid).catch(() => null), loadImages(bid).catch(() => null)]);
     if (mobile()) setMobile("reader");
@@ -1018,6 +1041,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
   function layout(target) {
     if (!S.ch) return;
+    if (S.scroll) return layoutScroll(target);
     const g = geometry(), book = S.catalog[S.cur.bid], ch = S.ch, n = g.spread ? 2 : 1;
     S.box = { tw:g.tw, th:g.th };
     const vars = `--pw:${g.pw}px;--ph:${g.ph}px;--mt:${g.mt}px;--mb:${g.mb}px;--ml:${g.ml}px;--tw:${g.tw}px;--th:${g.th}px;--cg:${g.cg}px;--fs:${S.fs}px`;
@@ -1082,6 +1106,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
   // いま見ているページの先頭の位置（段落ID＋その段落の中の何文字目か）
   function anchorAt(k = S.page || 0) {
+    if (L?.scroll) return scrollAnchor();
     const el = blockAtPage(k); if (!el) return null;
     const base = L.flows[0].getBoundingClientRect(), r0 = el.getClientRects()[0];
     if (!r0 || pageOfRect(r0, base) >= k) return { block:el.dataset.id, off:0 };
@@ -1104,7 +1129,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
   // keep が無い（ページを送った・飛んだ）ときは、覚えていた読み位置を捨てて今のページから取り直す
   function show(p, keep) {
-    if (!L) return;
+    if (!L || L.scroll) return;
     if (!keep) { S.anchor = null; document.body.classList.remove("chrome"); }
     p = Math.max(0, Math.min(L.pages - 1, p));
     if (L.n === 2) p -= p % 2;
@@ -1135,7 +1160,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
      ページ数は画面の大きさ・文字の大きさ・縦横で変わるので、その組み合わせごとに
      各章を見えない所で組んで数え、前の章までのページ数を足して通し番号にする */
   const PM = { key:null, counts:new Map(), tok:0 };
-  const pmKey = () => L && S.cur ? [S.cur.bid, L.pw, L.ph, S.fs, S.vert ? 1 : 0].join("|") : null;
+  const pmKey = () => L && !L.scroll && S.cur ? [S.cur.bid, L.pw, L.ph, S.fs, S.vert ? 1 : 0].join("|") : null;
   function notePages() {
     const k = pmKey();
     if (PM.key !== k) { PM.key = k; PM.counts = new Map(); }
@@ -1190,10 +1215,12 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
   function next() {
     if (!L) return;
+    if (L.scroll) return scrollStep(1);
     if (S.page + L.n < L.pages) show(S.page + L.n); else goChapter(1);
   }
   function prev() {
     if (!L) return;
+    if (L.scroll) return scrollStep(-1);
     if (S.page > 0) show(S.page - L.n); else goChapter(-1);
   }
   function goChapter(dir) {
@@ -1278,7 +1305,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }));
   mqNarrow.addEventListener?.("change", updateImm); mqTouch.addEventListener?.("change", updateImm);
   document.addEventListener("keydown", e => {
-    if (!L || !$("#gate").hidden || e.target.closest("input,textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!L || !$("#gate").hidden || e.target.closest("input,textarea,select") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (L.scroll) { if ($("#pop").hidden && !S.panel) scrollKey(e); return; }
     if (e.key === "ArrowLeft") { turn("l"); e.preventDefault(); }
     else if (e.key === "ArrowRight") { turn("r"); e.preventDefault(); }
     else if (e.key === "PageDown" || e.key === " ") { next(); e.preventDefault(); }
@@ -1286,7 +1314,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   });
   let wheelAt = 0;
   stage().addEventListener("wheel", e => {
-    if (!L) return;
+    if (!L || L.scroll) return;
     e.preventDefault();
     const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? (S.vert ? -e.deltaX : e.deltaX) : e.deltaY;
     if (Math.abs(d) < 8 || Date.now() - wheelAt < 380) return;
@@ -1295,9 +1323,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   // iOS Safari はピンチでの拡大を viewport の指定だけでは止めないため、ここでも止める
   ["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive:false }));
   // 本文の上で指を動かしても、画面が動かないようにする（めくりは指を離したときに判定）
-  stage().addEventListener("touchmove", e => { if (e.cancelable && getSelection().isCollapsed) e.preventDefault(); }, { passive:false });
+  stage().addEventListener("touchmove", e => { if (!L?.scroll && e.cancelable && getSelection().isCollapsed) e.preventDefault(); }, { passive:false });
   let sx = null, sy = 0;
-  stage().addEventListener("pointerdown", e => { if (e.pointerType !== "mouse") { sx = e.clientX; sy = e.clientY; } });
+  stage().addEventListener("pointerdown", e => { if (e.pointerType !== "mouse" && !L?.scroll) { sx = e.clientX; sy = e.clientY; } });
   stage().addEventListener("pointerup", e => {
     if (sx == null) return;
     const dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
@@ -1307,8 +1335,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
   function jump(id, quiet, off) {
     if (!L) return;
-    const p = pageOfPoint(id, off); if (p == null) return;
-    show(p);
+    if (L.scroll) { if (!scrollToPoint(id, off, false, quiet ? 1 : 24)) return; SC.last = scPos(); scrollSync(true); }
+    else { const p = pageOfPoint(id, off); if (p == null) return; show(p); }
     if (quiet) return;
     const els = stage().querySelectorAll(`[data-id="${CSS.escape(id)}"]`);
     els.forEach(el => el.classList.add("hit"));
@@ -1318,19 +1346,26 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   // force が無ければ、ページの大きさが変わっていないときは組み直さない
   function relayout(force) {
     if (!L || !S.ch) return;
-    if (force !== true) { const g = geometry(); if (g.pw === L.pw && g.ph === L.ph && g.spread === (L.n === 2)) return; }
+    if (L.scroll) {                       // スクロール表示：文字や大きさが変わるときだけ組み直し、それ以外は今の位置へ戻すだけ
+      if (force === true) { const a = scrollAnchor() || S.sa; layout(a || { page:0 }); }
+      else restoreScroll();
+      return;
+    }
+    if (force !== true && force !== "font") { const g = geometry(); if (g.pw === L.pw && g.ph === L.ph && g.spread === (L.n === 2)) return; }
     layout(S.anchor || (S.anchor = anchorAt()) || { page:0 });
   }
   let rzT = 0;
-  new ResizeObserver(() => { clearTimeout(rzT); rzT = setTimeout(relayout, 120); }).observe(stage());
-  document.fonts?.ready.then(() => relayout(true));
+  new ResizeObserver(() => { if (L?.scroll) SC.freeze = true; clearTimeout(rzT); rzT = setTimeout(relayout, 120); }).observe(stage());
+  document.fonts?.ready.then(() => relayout("font"));
   // 文字の形（Webフォント）が後から届いたときも、今のページのまま組み直す
   let fontT = 0;
-  document.fonts?.addEventListener?.("loadingdone", () => { clearTimeout(fontT); fontT = setTimeout(() => relayout(true), 300); });
+  document.fonts?.addEventListener?.("loadingdone", () => { clearTimeout(fontT); fontT = setTimeout(() => relayout("font"), 300); });
 
   /* ---------- 組み方・文字・全画面・しおり ---------- */
   function applyMode() {
     $("#reader").classList.toggle("vert", S.vert);
+    $("#reader").classList.toggle("scrollmode", !!S.scroll);
+    $("#modeBtn")?.setAttribute("aria-pressed", String(!!S.scroll));
     document.querySelectorAll("[data-wm]").forEach(b => b.classList.toggle("on", (b.dataset.wm === "v") === S.vert));
   }
   document.querySelectorAll("[data-wm]").forEach(b => b.onclick = () => {
@@ -1353,12 +1388,12 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   $("#fullBtn").onclick = () => setFull(!S.full);
   document.addEventListener("keydown", e => { if (e.key === "Escape" && S.full) setFull(false); });
 
-  function updateBmGo() { $("#bmGo").hidden = !S.bms[S.cur?.bid]; }
+  function updateBmGo() { $("#bmGo").hidden = !S.bms[S.cur?.bid]; if (L?.scroll) markBookmark(); }
   $("#bmHere").onclick = () => {
     const a = L && anchorAt(); if (!a || !S.cur) return;
     S.bms[S.cur.bid] = { no:S.cur.no, block:a.block, off:a.off, at:Date.now() };
     ls.set(BMS, S.bms); RS.bms = S.bms; saveRS(); updateBmGo(); renderShelf();
-    if (L) { L.bmPage = null; show(S.page, true); }
+    if (L?.scroll) markBookmark(); else if (L) { L.bmPage = null; show(S.page, true); }
     status("しおりを挟みました（この端末に保存）。"); setTimeout(() => status(""), 2500);
   };
   $("#bmGo").onclick = () => {
@@ -1739,7 +1774,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     $("#recN").textContent = rn ? String(rn) : "";
     clearTimeout(posT);
     posT = setTimeout(() => {
-      if (!L || !S.cur) return;
+      if (!L || L.scroll || !S.cur) return;
       const a = anchorAt(); if (!a) return;
       const off = bookOffset(), total = bookTotal(), last = Math.min(L.pages, S.page + L.n);
       const pct = total ? Math.min(1, ((off ?? 0) + last) / total) : 0;
@@ -1821,6 +1856,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     if (gn) return goNote(...gn.dataset.gonote.split("|"));
     const r = e.target.closest("[data-ref]");
     if (r) { hidePop(); return jump(r.dataset.ref); }
+    const so = e.target.closest("[data-scrollopt]");
+    if (so) { setScroll(!S.scroll); so.setAttribute("aria-pressed", String(!!S.scroll)); so.textContent = S.scroll ? "あり" : "なし"; return; }
     const o = e.target.closest("[data-opt]");
     if (o) { const k = o.dataset.opt; O[k] = !O[k]; ls.set(OPT, O); o.setAttribute("aria-pressed", String(O[k])); o.textContent = O[k] ? "あり" : "なし"; if (k === "kp" && L) relayout(true); return; }
     if (e.target.closest("[data-bioon]")) return bioSetup(e.target.closest("[data-bioon]"));
@@ -1834,7 +1871,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     let o = 0; const start = new Map();
     const known = PM.key === pmKey() && chaptersOf().every(c => PM.counts.has(c.no));
     for (const c of chaptersOf()) { start.set(c.no, o + 1); o += PM.counts.get(c.no) || 0; }
-    const toc = `<ul class="toc">${groups.map(g => `<li><button data-toc="${g.no}" class="${g.nos.includes(S.cur.no) ? "on" : ""}"><span>${esc(g.title)}</span>${known ? `<span class="pn">${start.get(g.no)}</span>` : ""}</button></li>`).join("")}</ul>`;
+    const pnv = g => L?.scroll ? `${Math.round((L.chProg.get(g.no) || 0) * 100)}%` : (known ? String(start.get(g.no)) : "");
+    const toc = `<ul class="toc">${groups.map(g => `<li><button data-toc="${g.no}" class="${g.nos.includes(S.cur.no) ? "on" : ""}"><span>${esc(g.title)}</span>${pnv(g) !== "" ? `<span class="pn">${pnv(g)}</span>` : ""}</button></li>`).join("")}</ul>`;
     showPop(`<h3>${esc(b.title)}</h3>` + accHTML(b, { open:which, toc, curNo:S.ch?.no }), anchor);
     const pop = $("#pop"); pop.dataset.nid = ""; pop.dataset.bid = "";
     pop.querySelector(which === "toc" ? ".toc .on" : ".nmini.here")?.scrollIntoView({ block:"center" });
@@ -1852,6 +1890,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
   function updateScrub() {
     const sc = $("#scrub"); if (!sc || !L) return;
+    if (L.scroll) { sc.max = "1000"; if (!S.scrubbing && S.sa) sc.value = String(Math.round(progressOf(S.sa.block, S.sa.off) * 1000)); sc.dir = S.vert ? "rtl" : "ltr"; return; }
     const total = bookTotal(), off = bookOffset();
     const all = total ?? L.pages, cur = (total != null && off != null ? off : 0) + S.page;
     sc.max = String(Math.max(0, all - 1)); if (!S.scrubbing) sc.value = String(cur);
@@ -1859,6 +1898,10 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
   $("#scrub").addEventListener("input", e => {
     S.scrubbing = true; const n = Number(e.target.value), tip = $("#scrubTip");
+    if (L?.scroll) {
+      const pt = pointAtProgress(n / 1000), ct = titleFor(S.catalog[S.cur.bid], noOf(pt.block));
+      tip.textContent = `${Math.round(n / 10)}%` + (ct ? `・${ct}` : ""); tip.hidden = false; clearTimeout(chromeT); return;
+    }
     const total = bookTotal();
     let label = `${n + 1} ページ`;
     if (total != null) { const t = bookPageToChapter(n), ct = titleFor(S.catalog[S.cur.bid], t.no); if (ct) label += `・${ct}`; }
@@ -1866,6 +1909,12 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   });
   $("#scrub").addEventListener("change", e => {
     S.scrubbing = false; $("#scrubTip").hidden = true;
+    if (L?.scroll) {
+      const pt = pointAtProgress(Number(e.target.value) / 1000);
+      scrollToPoint(pt.block, pt.off); SC.last = scPos(); scrollSync(true);
+      if (document.body.classList.contains("chrome")) setChrome(true);
+      return;
+    }
     const n = Number(e.target.value), total = bookTotal();
     if (total == null) { show(n); return; }
     const t = bookPageToChapter(n);
@@ -1897,7 +1946,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     const bioOk = !!(window.PublicKeyCredential && navigator.credentials && isSecureContext);
     const yn = k => `<button class="tb" data-opt="${k}" aria-pressed="${O[k]}">${O[k] ? "あり" : "なし"}</button>`;
     showPop(`<h3>表示の設定</h3>
-      <div class="optrow"><span class="lb">めくりの動き</span>${yn("anim")}</div>
+      <div class="optrow"><span class="lb">スクロールで読む<span class="note">ページをめくる代わりに、章をまたいで続けて読みます</span></span><button class="tb" data-scrollopt="1" aria-pressed="${!!S.scroll}">${S.scroll ? "あり" : "なし"}</button></div>
+      <div class="optrow"><span class="lb">めくりの動き<span class="note">ページ表示のとき</span></span>${yn("anim")}</div>
       <div class="optrow"><span class="lb">章の冒頭に要点<span class="note">要約がある章だけ</span></span>${yn("kp")}</div>
       <div class="optrow"><span class="lb">Face ID・Touch ID で開く<span class="note">${bioOk ? (ls.get(BIO, null) ? "この端末で使えるようになっています" : "合言葉の代わりに使えます") : "この端末・ブラウザでは使えません"}</span></span>
         ${bioOk ? (ls.get(BIO, null) ? '<button class="tb" data-biooff="1">やめる</button>' : '<button class="tb" data-bioon="1">設定する</button>') : ""}</div>
@@ -1957,9 +2007,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     const el = n => (n.nodeType === 1 ? n : n.parentElement);
     const f = el(r.startContainer)?.closest(".flow"); if (!f || !L.flows.includes(f)) return null;
     let sb = el(r.startContainer).closest(".blk"), eb = el(r.endContainer).closest(".blk");
-    const blks = [...f.querySelectorAll(".blk")];
-    if (!sb) sb = blks.find(b => r.comparePoint(b, 0) >= 0 && r.intersectsNode(b));
-    if (!eb) eb = [...blks].reverse().find(b => r.intersectsNode(b));
+    const blks = () => L.blks || [...f.querySelectorAll(".blk")];
+    if (!sb) sb = blks().find(b => r.comparePoint(b, 0) >= 0 && r.intersectsNode(b));
+    if (!eb) eb = [...blks()].reverse().find(b => r.intersectsNode(b));
     if (!sb || !eb) return null;
     const start = sb.contains(r.startContainer) ? offIn(sb, r.startContainer, r.startOffset) : 0;
     const end = eb.contains(r.endContainer) ? offIn(eb, r.endContainer, r.endOffset) : eb.textContent.length;
@@ -1975,13 +2025,14 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
   // 本の中のおおよその位置（0〜1）。ノート画面で「本のどこに線を引いたか」を描くのに使う
   function bookPos(blockId) {
-    const chs = chaptersOf(), ci = Math.max(0, chs.findIndex(c => c.no === S.ch.no));
-    const bi = Math.max(0, S.ch.blocks.findIndex(b => b.id === blockId));
-    return chs.length ? (ci + bi / Math.max(1, S.ch.blocks.length)) / chs.length : 0;
+    const no = noOf(blockId) || S.ch.no, ch = S.bundles.get(S.cur.bid)?.chapters.find(c => c.no === no) || S.ch;
+    const chs = chaptersOf(), ci = Math.max(0, chs.findIndex(c => c.no === no));
+    const bi = Math.max(0, ch.blocks.findIndex(b => b.id === blockId));
+    return chs.length ? (ci + bi / Math.max(1, ch.blocks.length)) / chs.length : 0;
   }
   function addNote(info, color, text) {
     const bid = S.cur.bid, id = nid();
-    (RS.notes[bid] = RS.notes[bid] || {})[id] = { id, no:S.ch.no, block:info.block, start:info.start, eblock:info.eblock, end:info.end,
+    (RS.notes[bid] = RS.notes[bid] || {})[id] = { id, no:noOf(info.block) || S.ch.no, block:info.block, start:info.start, eblock:info.eblock, end:info.end,
       quote:info.quote, color, text:text || "", pos:Math.round(bookPos(info.block) * 1000) / 1000, at:Date.now() };
     saveRS(); getSelection().removeAllRanges(); hideSelTool(); renderMarks();
     return id;
@@ -2006,9 +2057,10 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     if (!L || !S.ch) return;
     for (const m of stage().querySelectorAll("mark.hl")) { const p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); m.remove(); p.normalize(); }
     $("#recN").textContent = liveNotes(S.cur.bid).length || "";
-    const ns = liveNotes(S.cur.bid).filter(n => n.no === S.ch.no);
+    const ns = liveNotes(S.cur.bid).filter(n => L.scroll || n.no === S.ch.no);
+    const find = (f, id) => L.scroll ? L.byId.get(id) : f.querySelector(`.blk[data-id="${CSS.escape(id)}"]`);
     for (const f of L.flows) for (const n of ns) {
-      const sb = f.querySelector(`.blk[data-id="${CSS.escape(n.block)}"]`), eb = f.querySelector(`.blk[data-id="${CSS.escape(n.eblock || n.block)}"]`);
+      const sb = find(f, n.block), eb = find(f, n.eblock || n.block);
       if (!sb || !eb) continue;
       const a = textPoint(sb, Math.min(n.start, Math.max(0, sb.textContent.length - 1)));
       const z = textPoint(eb, Math.max(0, Math.min(n.end, eb.textContent.length) - 1));
@@ -2173,6 +2225,197 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
+  /* ================= スクロール表示 =================
+     ページをめくる代わりに、本全体を1本の長い紙面にして、スクロールで続けて読む。
+     横書きは上から下へ、縦書きは右から左へ進む。読み位置（段落＋文字位置）・しおり・マーカー・記録は
+     ページ表示と同じものを使うので、表示を切り替えても同じ所から読める。 */
+  const SC = { saveT:0, raf:0, last:0, acc:0, freeze:false };
+  const noOf = id => Number(String(id).slice(1).split("-b")[0]) || 0;
+  const scEl = () => document.getElementById("scroller");
+  const vpRect = () => scEl().getBoundingClientRect();
+  // 「進む向き」で測る座標：横書きは上から、縦書きは右から（右端ほど小さい値になるよう符号を反転）
+  const lead = rc => S.vert ? -rc.right : rc.top;
+  const trail = rc => S.vert ? -rc.left : rc.bottom;
+  const vstart = () => { const v = vpRect(); return S.vert ? -v.right : v.top; };
+  const vlen = () => { const sc = scEl(); return S.vert ? sc.clientWidth : sc.clientHeight; };
+  const scPos = () => { const sc = scEl(); return S.vert ? -sc.scrollLeft : sc.scrollTop; };
+  const scMax = () => { const sc = scEl(); return S.vert ? sc.scrollWidth - sc.clientWidth : sc.scrollHeight - sc.clientHeight; };
+  function scrollFwd(d, smooth) {
+    const sc = scEl(); if (!sc) return;
+    const o = { behavior: smooth ? "smooth" : "auto" };
+    sc.scrollBy(S.vert ? { left:-d, ...o } : { top:d, ...o });
+  }
+  function charRect(el, off) {
+    const pt = textPoint(el, off); if (!pt) return null;
+    const r = document.createRange();
+    r.setStart(pt[0], pt[1]); r.setEnd(pt[0], Math.min(pt[0].length, pt[1] + 1));
+    const rs = r.getClientRects(); return rs.length ? rs[0] : null;
+  }
+  // いま画面の先頭にある位置（段落のID＋その段落の中の何文字目か）
+  function scrollAnchor() {
+    if (!L?.scroll || !L.blks.length) return null;
+    const vs = vstart(), blks = L.blks;
+    let lo = 0, hi = blks.length - 1, i = blks.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (trail(blks[mid].getBoundingClientRect()) > vs + 2) { i = mid; hi = mid - 1; } else lo = mid + 1;
+    }
+    const el = blks[i];
+    if (lead(el.getBoundingClientRect()) >= vs - 2) return { block:el.dataset.id, off:0 };
+    let a = 0, b = el.textContent.length - 1, ans = 0;
+    while (a <= b) {
+      const mid = (a + b) >> 1, c = charRect(el, mid);
+      if (c && lead(c) >= vs - 2) { ans = mid; b = mid - 1; } else a = mid + 1;
+    }
+    return { block:el.dataset.id, off:ans };
+  }
+  function progressOf(id, off) {
+    const i = L.idx.get(id); if (i == null) return 0;
+    return Math.min(1, (L.cum[i] + Math.min(off || 0, L.blks[i].textContent.length)) / Math.max(1, L.total));
+  }
+  function pointAtProgress(p) {
+    const t = Math.max(0, Math.min(1, p)) * L.total;
+    let lo = 0, hi = L.blks.length - 1, i = 0;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (L.cum[mid] <= t) { i = mid; lo = mid + 1; } else hi = mid - 1; }
+    return { block:L.blks[i].dataset.id, off:Math.max(0, Math.min(L.blks[i].textContent.length - 1, Math.floor(t - L.cum[i]))) };
+  }
+  // margin：画面の先頭からどれだけ空けるか。位置の復元は 1（同じ文字が先頭に来る）、利用者が飛ぶときは 24
+  function scrollToPoint(id, off, smooth, margin = 24) {
+    const el = L?.byId.get(id); if (!el) return false;
+    if (!off && L.chFirst.get(noOf(id)) === id) { scrollToChapterStart(noOf(id)); return true; }   // 章の最初の段落なら、見出しも見える所へ
+    const rc = (off ? charRect(el, off) : null) || el.getBoundingClientRect();
+    scrollFwd(lead(rc) - (vstart() + margin), smooth);
+    return true;
+  }
+  const chapterEl = no => L.flows[0].querySelector(`.chs[data-no="${no}"]`);
+  function scrollToChapterStart(no) {
+    const sec = chapterEl(no); if (!sec) return;
+    if (no === chaptersOf()[0]?.no) { scEl().scrollTo(S.vert ? { left:0 } : { top:0 }); return; }
+    scrollFwd(lead(sec.getBoundingClientRect()) - (vstart() + 8));
+  }
+  function scrollToChapterEnd(no) {
+    const sec = chapterEl(no); if (!sec) return;
+    scrollFwd(trail(sec.getBoundingClientRect()) - (vstart() + vlen()));
+  }
+  function setCurChapter(no) {
+    const bundle = S.bundles.get(S.cur.bid), ch = bundle?.chapters.find(c => c.no === no); if (!ch) return;
+    S.cur.no = no; S.ch = ch; ls.set(LAST, { bid:S.cur.bid, no });
+    renderShelfSoft();
+  }
+  function markBookmark() {
+    if (!L?.scroll) return;
+    L.flows[0].querySelectorAll(".blk.bmk").forEach(b => b.classList.remove("bmk"));
+    const bm = S.bms[S.cur?.bid]; if (bm) L.byId.get(bm.block)?.classList.add("bmk");
+  }
+
+  function layoutScroll(target) {
+    const bundle = S.bundles.get(S.cur.bid); if (!bundle) return;
+    const r = stage().getBoundingClientRect(), vert = S.vert;
+    const line = Math.min(vert ? r.height : r.width, (vert ? 44 : 40) * S.fs);
+    const pad = Math.max(16, Math.min(vert ? 40 : 56, Math.round((vert ? r.height : r.width) * .05)));
+    S.box = vert ? { tw:Math.floor(r.width * .8), th:Math.floor(line - pad * 2) } : { tw:Math.floor(line - pad * 2), th:Math.floor(r.height) };
+    const secs = chaptersOf().map(c => bundle.chapters.find(x => x.no === c.no)).filter(Boolean)
+      .map(ch => `<section class="chs" data-no="${ch.no}">${chapterHTML(ch)}</section>`).join("");
+    stage().innerHTML = `<div class="scroller ${vert ? "v" : "h"}" id="scroller" role="document" aria-label="本文" style="--fs:${S.fs}px;--spx:${pad}px"><div class="flow sc"${vert ? ` style="height:${line}px"` : ""}>${secs}</div></div>`;
+    const f = stage().querySelector(".flow"), blks = [...f.querySelectorAll(".blk")];
+    const cum = new Float64Array(blks.length + 1); blks.forEach((b, i) => { cum[i + 1] = cum[i] + b.textContent.length; });
+    const idx = new Map(blks.map((b, i) => [b.dataset.id, i])), byId = new Map(blks.map(b => [b.dataset.id, b]));
+    const chProg = new Map(), chFirst = new Map();
+    for (const sec of f.querySelectorAll(".chs")) { const b = sec.querySelector(".blk"); chProg.set(Number(sec.dataset.no), b ? cum[idx.get(b.dataset.id)] / Math.max(1, cum[blks.length]) : 0); if (b) chFirst.set(Number(sec.dataset.no), b.dataset.id); }
+    L = { scroll:true, vert, bid:S.cur.bid, n:1, pw:Math.floor(r.width), ph:Math.floor(r.height), spread:false, flows:[f], sheets:[], pages:1, bmPage:null,
+          blks, byId, idx, cum, chProg, chFirst, total:cum[blks.length], tw:S.box.tw, th:S.box.th, cg:0 };
+    S.page = 0; S.anchor = null;
+    const sc = scEl();
+    sc.addEventListener("scroll", () => { if (SC.raf) return; SC.raf = requestAnimationFrame(() => { SC.raf = 0; scrollSync(); }); }, { passive:true });
+    if (vert) sc.addEventListener("wheel", e => {                   // 縦書きは横に進むので、縦の回転を横の動きに直す
+      if (e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault(); sc.scrollLeft -= e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    }, { passive:false });
+    SC.freeze = true;
+    if (target?.block && scrollToPoint(target.block, target.off, false, 1)) { /* 位置を合わせた */ }
+    else if (target?.last) scrollToChapterEnd(S.cur.no);
+    else scrollToChapterStart(S.cur.no);
+    SC.freeze = false; SC.last = scPos(); SC.acc = 0;
+    markBookmark();
+    scrollSync(true);
+  }
+
+  function scrollSync(force) {
+    if (!L?.scroll || (SC.freeze && !force)) return;
+    const a = scrollAnchor(); if (!a) return;
+    S.sa = a; S.anchor = null;
+    const no = noOf(a.block);
+    if (no !== S.cur.no) setCurChapter(no);
+    const p = progressOf(a.block, a.off), cur = scPos(), d = Math.abs(cur - SC.last); SC.last = cur;
+    $("#pgInfo").textContent = `${Math.round(p * 100)}%`;
+    $("#pbarFill").style.width = (p * 100).toFixed(1) + "%";
+    updateScrub();
+    if (!force) {
+      if (d > 20 && document.body.classList.contains("chrome") && !S.scrubbing && $("#pop").hidden) setChrome(false);
+      if (d < vlen() * 1.5) {                                          // 読んだ分を「ページ数」に直して記録
+        SC.acc += d; const pl = vlen() * .9;
+        if (SC.acc >= pl) { const n = Math.floor(SC.acc / pl); SC.acc -= n * pl; const k = ymd(new Date()), o = RS.days[k] || { m:0, p:0 };
+          RS.days[k] = { m:o.m || 0, p:(o.p || 0) + n }; ls.set(RS_KEY, RS); SY.dirty = true; }
+      }
+      scrollSave();
+    }
+  }
+  function scrollSave() {
+    clearTimeout(SC.saveT);
+    SC.saveT = setTimeout(() => {
+      const a = S.sa; if (!a || !L?.scroll || !S.cur) return;
+      const p = progressOf(a.block, a.off);
+      RS.pos[S.cur.bid] = { no:noOf(a.block), block:a.block, off:a.off, pct:Math.round(p * 1000) / 1000, at:Date.now() };
+      if (!RS.fin[S.cur.bid]?.v && scMax() > 0 && scPos() >= scMax() - 8) {
+        RS.fin[S.cur.bid] = { v:true, at:Date.now() }; status("この本を読み終えました。"); setTimeout(() => status(""), 3000);
+      }
+      saveRS(); renderShelfSoft();
+    }, 1200);
+  }
+  // 縦書きの1行の長さ（紙面の高さ）。割合指定にするとツールバーの数字が変わるたびに本文全体を組み直してしまうので px で持つ
+  function sizeScroll() {
+    const sc = scEl(); if (!sc || !S.vert) return;
+    const f = sc.querySelector(".flow"), h = Math.min(sc.clientHeight, 44 * S.fs);
+    if (Math.abs((parseFloat(f.style.height) || 0) - h) > 1) f.style.height = h + "px";
+  }
+  // 大きさや文字の読み込みで組みが変わったとき、いま読んでいる所に戻す
+  function restoreScroll() {
+    if (!L?.scroll) { SC.freeze = false; return; }
+    sizeScroll();
+    const a = S.sa;
+    if (a) { scrollToPoint(a.block, a.off, false, 1); SC.last = scPos(); }
+    SC.freeze = false;
+    scrollSync(true);
+  }
+  function scrollStep(dir) {
+    if (dir > 0 && scPos() >= scMax() - 2) { status("この本の最後です。"); setTimeout(() => status(""), 1800); return; }
+    scrollFwd(dir * vlen() * .9, true);
+  }
+  function scrollKey(e) {
+    const k = e.key, page = vlen() * .9; let d = 0;
+    if (k === "PageDown" || (k === " " && !e.shiftKey)) d = page;
+    else if (k === "PageUp" || (k === " " && e.shiftKey)) d = -page;
+    else if (k === "ArrowDown") d = 64; else if (k === "ArrowUp") d = -64;
+    else if (k === "ArrowLeft") d = S.vert ? page : -page;
+    else if (k === "ArrowRight") d = S.vert ? -page : page;
+    else if (k === "Home") { e.preventDefault(); return scEl().scrollTo(S.vert ? { left:0 } : { top:0 }); }
+    else if (k === "End") { e.preventDefault(); return scrollFwd(scMax() - scPos()); }
+    if (d) { e.preventDefault(); scrollFwd(d, Math.abs(d) > 100); }
+  }
+
+  // 表示方式の切り替え（ページ ⇄ スクロール）。読んでいる位置は引き継ぐ
+  function setScroll(on) {
+    on = !!on; if (on === !!S.scroll) return;
+    let a = null;
+    if (L) {
+      a = L.scroll ? scrollAnchor() : (S.anchor || (S.anchor = anchorAt()));
+      if (a && L.scroll) setCurChapter(noOf(a.block));
+    }
+    S.scroll = on; savePrefs(); applyMode(); S.anchor = null;
+    if (S.ch) layout(a || { page:0 });
+  }
+  $("#modeBtn").onclick = () => setScroll(!S.scroll);
+
   /* ================= 8. 挿絵と図（Mac が images/<本のID>/ に暗号化して置く） ================= */
   S.imgs = new Map();
   const FIG = { urls:new Map(), busy:0, queue:[] };
@@ -2213,7 +2456,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     return u;
   }
   function loadFigures() {
-    const els = [...stage().querySelectorAll(".spread .fig[data-src]")];
+    const els = L ? L.flows.flatMap(f => [...f.querySelectorAll(".fig[data-src]")]) : [];
     if (!els.length) return;
     const put = (src, u) => stage().querySelectorAll(`.fig[data-src="${CSS.escape(src)}"] img`).forEach(img => {
       if (img.getAttribute("src") !== u) { img.onload = () => img.classList.add("on"); img.src = u; }
