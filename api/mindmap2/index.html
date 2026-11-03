@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mindmap2</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./mindmap2.css">
+<style>
+  :root {
+    --surface-0: #f1efe8;
+    --surface-1: #f7f5f0;
+    --surface-2: #ffffff;
+    --border: rgba(0, 0, 0, 0.1);
+    --text-primary: #2c2c2a;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+    --text-danger: #a32d2d;
+    --accent: #444441;
+    --accent-bg: #e8e6df;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font-size: 13px;
+  }
+
+  /* ---- 共通部品 ---- */
+  button {
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 10px;
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: inherit;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-bg); }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  button.primary:hover { opacity: 0.85; background: var(--accent); }
+  button.ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+  button.ghost:hover { background: var(--accent-bg); }
+  button.icon { padding: 2px 6px; line-height: 1.4; color: var(--text-muted); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  input[type="text"], input[type="password"], input[type="search"], select {
+    font: inherit;
+    font-size: 12.5px;
+    padding: 6px 8px;
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: inherit;
+    width: 100%;
+  }
+  label { font-size: 11.5px; color: var(--text-secondary); }
+
+  /* ---- ヘッダ ---- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--surface-1);
+  }
+  h1 { margin: 0; font-size: 14px; font-weight: 500; }
+  .grow { flex: 1; }
+  #status { font-size: 11.5px; color: var(--text-muted); }
+  #status.dirty { color: var(--text-secondary); }
+  #status.error { color: var(--text-danger); }
+
+  /* ---- 全体 ---- */
+  main { flex: 1; min-height: 0; display: flex; position: relative; }
+
+  /* ---- 一覧 ---- */
+  aside {
+    width: 240px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border-right: 0.5px solid var(--border);
+    background: var(--surface-1);
+  }
+  aside.hidden { display: none; }
+  .side-head { display: flex; align-items: center; gap: 6px; }
+  .side-head .title { font-size: 11.5px; color: var(--text-secondary); flex: 1; }
+  #list { list-style: none; margin: 0; padding: 0; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+  #list li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 6px 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #list li:hover { background: var(--surface-2); }
+  #list li.active { background: var(--accent-bg); }
+  #list .doc { flex: 1; min-width: 0; }
+  #list .doc-title { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #list .doc-time { font-size: 10.5px; color: var(--text-muted); }
+  #list .actions { display: none; gap: 2px; }
+  #list li:hover .actions, #list li.active .actions { display: flex; }
+  #list .none { padding: 8px; font-size: 11.5px; color: var(--text-muted); cursor: default; }
+  #list .none:hover { background: none; }
+  .side-foot { font-size: 10.5px; color: var(--text-muted); }
+
+  /* ---- 作業領域 ---- */
+  .work { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    min-height: 32px;
+    padding: 6px 8px 0;
+    overflow-x: auto;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--surface-1);
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 200px;
+    padding: 5px 6px 5px 10px;
+    border: 0.5px solid transparent;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab:hover { background: var(--accent-bg); }
+  .tab.active { background: var(--surface-0); border-color: var(--border); color: var(--text-primary); }
+  .tab .label { overflow: hidden; text-overflow: ellipsis; }
+  .tab .close { border: 0; background: none; padding: 0 2px; color: var(--text-muted); cursor: pointer; font-size: 12px; }
+  .tab .close:hover { color: var(--text-primary); background: none; }
+
+  .panes { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 12px; }
+  .pane { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pane.source { width: 300px; flex: none; }
+  .pane.source.hidden { display: none; }
+  .pane.map { flex: 1; }
+  .pane-head { display: flex; align-items: center; gap: 8px; }
+  .pane-head label { flex: 1; }
+  textarea {
+    flex: 1;
+    resize: none;
+    padding: 10px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  #map { flex: 1; min-height: 0; background: var(--surface-2); border: 0.5px solid var(--border); border-radius: var(--radius); }
+  .hint { margin: 0; padding: 0 12px 8px; font-size: 11px; color: var(--text-muted); }
+
+  .empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .empty.hidden, .panes.hidden, .hint.hidden { display: none; }
+
+  /* ---- ダイアログ ---- */
+  dialog {
+    width: min(460px, calc(100vw - 32px));
+    padding: 16px;
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-1);
+    color: inherit;
+    font-size: 13px;
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.3); }
+  dialog h2 { margin: 0 0 4px; font-size: 14px; font-weight: 500; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row.tight > button { flex: none; }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-primary); }
+  .check input { width: auto; }
+  fieldset { margin: 14px 0 0; padding: 10px 12px 12px; border: 0.5px solid var(--border); border-radius: 8px; }
+  legend { font-size: 11.5px; color: var(--text-secondary); padding: 0 4px; }
+  .note { margin: 6px 0 0; font-size: 11px; color: var(--text-muted); line-height: 1.6; }
+  .note.warn { color: var(--text-danger); }
+  .dialog-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .msg { margin: 10px 0 0; font-size: 11.5px; color: var(--text-secondary); min-height: 1.2em; }
+  .msg.error { color: var(--text-danger); }
+
+  @media (max-width: 860px) {
+    aside { position: absolute; z-index: 20; top: 0; bottom: 0; box-shadow: 0 0 24px rgba(0,0,0,0.12); }
+    .panes { flex-direction: column; }
+    .pane.source { width: auto; height: 150px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="toggleList" class="ghost" title="一覧の表示切替">☰</button>
+  <h1>mindmap2</h1>
+  <span class="grow"></span>
+  <span id="status">—</span>
+  <button id="saveBtn" class="primary">保存</button>
+  <button id="reloadBtn" class="ghost" title="保存先から読み直す">再読込</button>
+  <button id="settingsBtn" class="ghost">設定</button>
+</header>
+
+<main>
+  <aside id="sidebar">
+    <div class="side-head">
+      <span class="title">マインドマップ</span>
+      <button id="newBtn">＋ 新規</button>
+    </div>
+    <input id="search" type="search" placeholder="絞り込み" autocomplete="off">
+    <ul id="list"></ul>
+    <div class="side-foot" id="count"></div>
+  </aside>
+
+  <section class="work">
+    <div class="tabs" id="tabs"></div>
+
+    <div class="empty" id="empty">
+      <p>左の一覧から選ぶか、新規作成してください。</p>
+      <button id="emptyNewBtn">＋ 新しいマインドマップ</button>
+    </div>
+
+    <div class="panes hidden" id="panes">
+      <section class="pane source" id="sourcePane">
+        <label for="src">Markdown</label>
+        <textarea id="src" spellcheck="false"></textarea>
+      </section>
+      <section class="pane map">
+        <div class="pane-head">
+          <label>マインドマップ</label>
+          <button id="toggleSrc" class="ghost">Markdownを隠す</button>
+        </div>
+        <div id="map"></div>
+      </section>
+    </div>
+    <p class="hint hidden" id="hint">↑↓で移動 / ←→で開閉 / スペースで編集(Enterで決定・Escで取消) / Tabで子を追加 / Enterで同じ階層に追加 / Deleteで削除</p>
+  </section>
+</main>
+
+<!-- 設定 -->
+<dialog id="settingsDialog">
+  <h2>設定</h2>
+
+  <fieldset>
+    <legend>保存先(JSONBin)</legend>
+    <div class="field">
+      <label for="binId">Bin ID</label>
+      <input id="binId" type="text" placeholder="未設定ならこのブラウザにだけ保存されます" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="keyType">キーの種類</label>
+      <select id="keyType">
+        <option value="master">Master Key (X-Master-Key)</option>
+        <option value="access">Access Key (X-Access-Key)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="apiKey">APIキー</label>
+      <input id="apiKey" type="password" autocomplete="off">
+    </div>
+    <div class="row tight" style="margin-top:10px">
+      <button id="testBtn" class="ghost">接続テスト</button>
+      <button id="createBinBtn" class="ghost">新しいBinを作成</button>
+    </div>
+    <p class="note">APIキーはこのブラウザの localStorage に保存されます。共用の端末では使わないでください。</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>暗号化</legend>
+    <label class="check"><input id="encrypt" type="checkbox"> パスフレーズで暗号化して預ける</label>
+    <div class="field">
+      <label for="pass1">パスフレーズ</label>
+      <input id="pass1" type="password" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="pass2">確認のためもう一度</label>
+      <input id="pass2" type="password" autocomplete="new-password">
+    </div>
+    <label class="check" style="margin-top:10px"><input id="rememberPass" type="checkbox"> このタブの間だけ記憶する</label>
+    <p class="note">AES-GCM(256bit) / PBKDF2-SHA256 で本文を暗号化します。更新日時と版数だけは暗号化されません。</p>
+    <p class="note warn">パスフレーズを忘れると誰にも復号できません。控えを別の場所に残してください。</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>バックアップ</legend>
+    <div class="row tight">
+      <button id="exportBtn" class="ghost">JSONで書き出し</button>
+      <button id="importBtn" class="ghost">JSONから取り込み</button>
+    </div>
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
+    <p class="note">書き出しは復号された状態の全マップです。取り込みは今の一覧に追加されます。</p>
+  </fieldset>
+
+  <p class="msg" id="settingsMsg"></p>
+  <div class="dialog-foot">
+    <button id="settingsCancel" class="ghost">閉じる</button>
+    <button id="settingsSave" class="primary">保存して反映</button>
+  </div>
+</dialog>
+
+<!-- パスフレーズの入力 -->
+<dialog id="passDialog">
+  <h2>パスフレーズ</h2>
+  <p class="note" id="passNote">保存されている内容は暗号化されています。</p>
+  <div class="field">
+    <label for="passInput">パスフレーズ</label>
+    <input id="passInput" type="password" autocomplete="current-password">
+  </div>
+  <label class="check" style="margin-top:10px"><input id="passRemember" type="checkbox"> このタブの間だけ記憶する</label>
+  <p class="msg" id="passMsg"></p>
+  <div class="dialog-foot">
+    <button id="passCancel" class="ghost">あとで</button>
+    <button id="passOk" class="primary">開く</button>
+  </div>
+</dialog>
+
+<script type="module" src="./mindmap2.app.js"></script>
+</body>
+</html>

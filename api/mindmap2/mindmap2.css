@@ -1,0 +1,38 @@
+/* mindmap2.css — マインドマップの描画に必要な分だけ。
+   色は各アプリのCSS変数を優先し、無ければ既定値を使う。 */
+
+.mm-host { position: relative; }
+.mm-host:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-bg, #e8e6df); }
+
+.mindmap-svg { width: 100%; height: 100%; display: block; }
+.mindmap-frame { width: 100%; height: 100%; border: 0; border-radius: var(--radius, 8px); background: #fff; }
+.mindmap-fallback {
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: var(--surface-1, #f7f5f0);
+  padding: 10px;
+  border-radius: var(--radius, 8px);
+}
+.mm-empty { font-size: 13px; color: var(--text-muted, #888780); padding: 10px 0; }
+.mm-error { font-size: 13px; color: var(--text-danger, #a32d2d); margin: 0 0 8px; }
+
+/* カーソル中の枝。foreignObjectは枝の大きさで切り抜かれるため、枠は内側に描く */
+.markmap-node.mm-current .markmap-foreign {
+  background: var(--accent-bg, #e8e6df);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--accent, #444441);
+}
+.markmap-node.mm-current > line { stroke: var(--accent, #444441); stroke-width: 3; }
+
+/* 枝に重ねる編集欄 */
+.mm-editor {
+  position: absolute;
+  z-index: 5;
+  padding: 1px 5px;
+  border: 1px solid var(--accent, #444441);
+  border-radius: 4px;
+  background: var(--surface-2, #ffffff);
+  color: var(--text-primary, #2c2c2a);
+  font-family: inherit;
+  line-height: 1.2;
+}
