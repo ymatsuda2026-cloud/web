@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>動画ナレッジ</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../api/mindmap2/mindmap2.css">
+<link rel="stylesheet" href="./css/styles.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <i class="ti ti-movie brand-icon" aria-hidden="true"></i>
+    <span class="brand">動画ナレッジ</span>
+    <nav id="space-switch" class="space-switch"></nav>
+    <span id="sync-status" class="foot-note"></span>
+
+    <div class="topbar-scroll">
+      <div class="search">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        <input type="text" id="search-input" class="search-input" placeholder="タイトルと要約を検索">
+      </div>
+      <div id="source-filter" class="chip-row"></div>
+      <div id="status-filter" class="chip-row"></div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="toggle-tags" class="btn-ghost" aria-label="タグの表示を切り替え"><i class="ti ti-tag" aria-hidden="true"></i></button>
+      <button id="reload" class="btn-ghost" aria-label="Notionから読み直す"><i class="ti ti-refresh" aria-hidden="true"></i></button>
+      <button id="bulk-generate" class="btn-ghost" aria-label="完了ぶんをまとめて生成"><i class="ti ti-sparkles" aria-hidden="true"></i></button>
+      <button id="cross-chat" class="btn-ghost" aria-label="横断チャット"><i class="ti ti-messages" aria-hidden="true"></i></button>
+      <button id="open-vocab" class="btn-ghost" aria-label="語彙の整理"><i class="ti ti-tags" aria-hidden="true"></i></button>
+      <button id="open-settings" class="btn-ghost" aria-label="設定"><i class="ti ti-settings" aria-hidden="true"></i></button>
+      <button id="active-model" class="model-switch"></button>
+    </div>
+  </header>
+
+  <nav class="viewtabs">
+    <button class="viewtab on" data-view="library"><i class="ti ti-layout-grid" aria-hidden="true"></i>ライブラリ</button>
+    <button class="viewtab" data-view="favorites"><i class="ti ti-star" aria-hidden="true"></i>お気に入り</button>
+    <button class="viewtab" data-view="ideas"><i class="ti ti-bulb" aria-hidden="true"></i>アイデア</button>
+    <button class="viewtab" data-view="mindmaps"><i class="ti ti-sitemap" aria-hidden="true"></i>マインドマップ</button>
+    <button class="viewtab" data-view="notes"><i class="ti ti-highlight" aria-hidden="true"></i>ノート</button>
+    <button class="viewtab" data-view="records"><i class="ti ti-chart-dots" aria-hidden="true"></i>記録</button>
+  </nav>
+
+  <div id="tag-rail"></div>
+  <div id="bulk"></div>
+
+  <main id="stage" class="stage"></main>
+</div>
+
+<div id="modal-root"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
