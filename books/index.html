@@ -235,6 +235,12 @@ body.imm .stage{background:var(--desk)}
 .nbad{color:#a63d32} .ngood{color:#2f7a45}
 .nwrap{overflow-x:auto}
 .ntail{font:12px/1.6 ui-monospace,Menlo,monospace; background:var(--sheet); border:1px solid var(--line); border-radius:6px; padding:10px 12px; white-space:pre-wrap; word-break:break-all; max-height:260px; overflow:auto}
+.nlimit{display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-top:12px; padding:10px 14px; background:var(--sheet); border:1px solid var(--line); border-radius:8px; font-size:14px}
+.nlimit b{font-size:17px; font-weight:500; font-variant-numeric:tabular-nums}
+.nlimit .h{font-size:12px; color:var(--muted); flex-basis:100%}
+.nlimit input{width:5.5em; font:inherit; font-size:16px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; background:var(--paper); color:var(--ink)}
+.nlimit input:focus-visible{outline:2px solid var(--foil); outline-offset:1px}
+.nlimit .err{color:#a63d32; font-size:12.5px; flex-basis:100%}
 .nnote{font-size:13px; color:var(--muted); line-height:1.75; background:var(--sheet); border:1px dashed var(--line); border-radius:8px; padding:10px 14px; margin-top:12px}
 .nnote code{font-size:12px}
 /* 追加：目次・要約・設定の小窓、早送り、記録、検索 */
@@ -349,6 +355,12 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 .fig{margin:.9em auto; break-inside:avoid; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.03); border-radius:2px}
 .fig img{max-width:100%; max-height:100%; object-fit:contain; opacity:0; transition:opacity .2s}
 .fig img.on{opacity:1}
+.fig[data-src]{cursor:pointer}
+.ftoast{position:fixed; z-index:46; left:50%; transform:translateX(-50%); bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  display:flex; align-items:center; gap:14px; background:var(--cloth); color:var(--cloth-ink); border-radius:8px; padding:9px 10px 9px 16px;
+  box-shadow:0 10px 30px rgba(20,24,40,.3); font-size:14px; max-width:calc(100vw - 24px)}
+.ftoast button{border:1px solid rgba(255,255,255,.4); background:transparent; color:inherit; border-radius:6px; padding:4px 12px; font:inherit; cursor:pointer}
+.ftoast button:focus-visible{outline:2px solid var(--foil); outline-offset:2px}
 .spread.anim .flow{transition:transform .32s cubic-bezier(.2,.7,.2,1)}
 .spread.fadein{animation:shkfade .28s ease}
 @keyframes shkfade{from{opacity:.25}to{opacity:1}}
@@ -516,6 +528,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 <section id="search" class="panel" hidden aria-label="本文の検索"></section>
 <section id="notes" class="panel" hidden aria-label="ノート"></section>
 <div class="pop" id="pop" role="dialog" hidden></div>
+<div class="ftoast" id="ftoast" role="status" aria-live="polite" hidden><span id="ftoastMsg"></span><button type="button" id="ftoastUndo">元に戻す</button></div>
 <nav class="tabbar" id="tabbar" hidden>
   <button data-m="shelf" class="on">本棚</button>
   <button data-m="reader">本文</button>
@@ -699,7 +712,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   function lock() {
     flushRS();
     secret = null; S.sums = new Map(); S.meta = null; S.metaTried = false;
-    if (typeof FIG !== "undefined") { FIG.urls.forEach(u => URL.revokeObjectURL(u)); FIG.urls.clear(); S.imgs = new Map(); } dec = null; S.bundles.clear(); S.catalog = {}; S.books = []; S.cur = null; S.ch = null;
+    if (typeof FIG !== "undefined") { FIG.urls.forEach(u => URL.revokeObjectURL(u)); FIG.urls.clear(); FIG.sha.clear(); S.imgs = new Map(); S.hidden = new Map(); } dec = null; S.bundles.clear(); S.catalog = {}; S.books = []; S.cur = null; S.ch = null;
     $("#shelf").innerHTML = ""; $("#stage").innerHTML = '<div class="empty">本棚から本と章を選んでください。</div>'; $("#rtools").hidden = true; $("#pbar").hidden = true; L = null;
     showGate();
   }
@@ -1480,6 +1493,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       const seen = new Set();
       S.inv = (inv.books || []).filter(b => b.bid && !seen.has(b.bid) && seen.add(b.bid));
       await loadQueue();
+      if (S.settings == null) await loadSettings().catch(() => {});   // 「約○日で終わります」の計算に使う
       M.sel.clear();
       renderManage();
     } catch (e) { $("#mlist").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
@@ -1497,7 +1511,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       b.querySelector(".n").textContent = cnt[b.dataset.f];
     });
     $("#mnote").textContent = cnt.queue
-      ? `変換待ちは ${cnt.queue} 冊です。Mac は毎日23時に、上から順に1日20冊まで変換します（今のままなら約${Math.ceil(cnt.queue / 20)}日で終わります）。`
+      ? (dailyLimit()
+          ? `変換待ちは ${cnt.queue} 冊です。Mac は毎日23時に、上から順に1日${dailyLimit()}冊まで変換します（今のままなら約${daysLeft(cnt.queue, dailyLimit())}日で終わります）。上限は「夜間処理の状況」で変えられます。`
+          : `変換待ちは ${cnt.queue} 冊です。Mac は次の23時の実行で全部変換します（1日の上限なし）。`)
       : "未変換の本を選んで「変換待ちにする」を押すと、Mac が毎日23時に変換します。";
     const q = M.q.toLowerCase();
     const rank = b => { const st = stOf(b.bid, qset); return st === "queue" ? qpos.get(b.bid) : st === "todo" ? 1e6 : 2e6; };
@@ -1627,8 +1643,44 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   $("#mAdd").onclick = () => changeQueue(true);
   $("#mDel").onclick = () => changeQueue(false);
 
+  /* ---------- 夜間処理の設定（settings.json.age）：1日に変換する上限など。Mac は毎回の実行の最初に読む ---------- */
+  S.settings = null; S.ssha = null;
+  async function loadSettings() {
+    const r = await fetch(apiURL("settings.json.age"), { cache:"no-store", headers:apiHeaders() });
+    if (r.status === 404) { S.settings = {}; S.ssha = null; return S.settings; }
+    if (!r.ok) throw new Error("設定を読めませんでした（" + r.status + "）。");
+    const j = await r.json();
+    S.ssha = j.sha;
+    S.settings = JSON.parse(await dec.decrypt(unb64(String(j.content || "").replace(/\s/g, "")), "text"));
+    return S.settings;
+  }
+  async function saveSettings(patch) {
+    if (!navigator.onLine) throw new Error("オフラインのため保存できません。通信できる所で操作してください。");
+    for (let tries = 0; tries < 2; tries++) {
+      if (S.settings == null || tries) await loadSettings();   // 別の端末で変わっていたら読み直して重ねる
+      const next = { ...S.settings, ...patch, updated:new Date().toISOString() };
+      const e = new AgeLib.Encrypter();
+      e.addRecipient(await AgeLib.identityToRecipient(secret.key));
+      const body = { message:"夜間処理の設定を更新", content:b64big(await e.encrypt(JSON.stringify(next))) };
+      if (S.ssha) body.sha = S.ssha;
+      const r = await fetch(apiURL("settings.json.age"), { method:"PUT", headers:{ ...apiHeaders(), "Content-Type":"application/json" }, body:JSON.stringify(body) });
+      if (r.status === 409 || r.status === 422) continue;
+      if (r.status === 403 || r.status === 404) throw new Error("保存できません。トークンの Contents の権限を「Read and write」にしてください。");
+      if (!r.ok) throw new Error("保存に失敗しました（" + r.status + "）。");
+      S.ssha = (await r.json()).content?.sha || null;
+      S.settings = next;
+      return;
+    }
+    throw new Error("別の端末で同時に変更されたため保存できませんでした。もう一度操作してください。");
+  }
+  // 1日の上限：書庫の設定 → Mac から届いた記録 → 既定の 20 の順に使う。0 は上限なし
+  const dailyLimit = () => Number.isInteger(S.settings?.daily_limit) ? S.settings.daily_limit
+    : Number.isInteger(N.st?.limit) ? N.st.limit : 20;
+  const limitText = n => n ? `${n}冊` : "上限なし";
+  const daysLeft = (q, n) => n ? Math.ceil(q / n) : 1;
+
   /* ---------- 夜間処理の状況 ---------- */
-  const N = { sel:0 };
+  const N = { sel:0, editLimit:false };
   const jdt = t => { const d = new Date(t); return isNaN(d) ? String(t || "") : d.toLocaleString("ja-JP", { month:"numeric", day:"numeric", weekday:"short", hour:"2-digit", minute:"2-digit" }); };
   const dur = (a, b) => { const s = Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000)); return s >= 60 ? `${Math.floor(s / 60)}分${s % 60}秒` : `${s}秒`; };
   const titleOf = bid => S.catalog[bid]?.title || (S.inv || []).find(b => b.bid === bid)?.title || bid;
@@ -1645,33 +1697,43 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   async function loadNight() {
     const el = $("#night");
     el.innerHTML = '<div class="empty">夜間処理の記録を読み込み中…</div>';
-    const [st, commits, inv, q] = await Promise.all([
+    const [st, commits, inv] = await Promise.all([
       getJSON("status.json.age").catch(() => null),
       loadCommits().catch(() => null),
       S.inv ? Promise.resolve(S.inv) : getJSON("inventory.json.age").then(j => (j.books || [])).catch(() => null),
       S.queue ? Promise.resolve(S.queue) : loadQueue().then(() => S.queue).catch(() => null),
+      loadSettings().catch(() => null),
     ]);
     if (inv && !S.inv) { const seen = new Set(); S.inv = inv.filter(b => b.bid && !seen.has(b.bid) && seen.add(b.bid)); }
-    N.st = st; N.commits = commits; N.sel = 0;
+    N.st = st; N.commits = commits; N.sel = 0; N.editLimit = false;
     renderNight();
   }
   function renderNight() {
     const el = $("#night"), st = N.st, runs = st?.runs || [], last = runs[0];
-    const limit = st?.limit || 20;
+    const limit = dailyLimit();
     const qLeft = (S.queue || []).filter(x => !S.catalog[x.bid]).length;
     const todo = S.inv ? S.inv.filter(b => !S.catalog[b.bid]).length : null;
     const ok = last && last.code === 0 && !(last.errors || []).length;
     let h = `<h2>夜間処理の状況</h2><div class="nmet">`;
     if (last) {
       h += `<div class="nm ${ok ? "ok" : "ng"}"><div class="l">前回の実行</div><div class="v">${ok ? "正常に終了" : last.code ? "失敗" : "エラーあり"}</div><div class="s">${esc(jdt(last.start))}・${esc(dur(last.start, last.end))}</div></div>
-        <div class="nm"><div class="l">前回変換した本</div><div class="v">${(last.converted || []).length}冊</div><div class="s">1日 ${limit}冊まで</div></div>`;
+        <div class="nm"><div class="l">前回変換した本</div><div class="v">${(last.converted || []).length}冊</div><div class="s">1日 ${limitText(limit)}${limit ? "まで" : ""}</div></div>`;
     } else {
       const lc = (N.commits || []).find(c => !/変換待ちを更新/.test(c.msg));
       h += `<div class="nm"><div class="l">最後に Mac から届いた更新</div><div class="v" style="font-size:17px">${lc ? esc(jdt(lc.at)) : "—"}</div><div class="s">${lc ? esc(lc.msg.slice(0, 40)) : "記録がありません"}</div></div>`;
     }
-    h += `<div class="nm"><div class="l">変換待ち（残り）</div><div class="v">${S.queue ? qLeft + "冊" : "—"}</div><div class="s">${qLeft ? `今のままなら約${Math.ceil(qLeft / limit)}日で終わります` : S.queue ? "待っている本はありません" : "読み込めませんでした"}</div></div>
+    h += `<div class="nm"><div class="l">変換待ち（残り）</div><div class="v">${S.queue ? qLeft + "冊" : "—"}</div><div class="s">${qLeft ? (limit ? `今のままなら約${daysLeft(qLeft, limit)}日で終わります` : "次の実行で全部変換します") : S.queue ? "待っている本はありません" : "読み込めませんでした"}</div></div>
       <div class="nm"><div class="l">未変換（NAS 全体）</div><div class="v">${todo == null ? "—" : todo + "冊"}</div><div class="s">変換済み ${Object.keys(S.catalog).length}冊</div></div>
       <div class="nm"><div class="l">次の実行</div><div class="v" style="font-size:17px">${nextRun()}</div><div class="s">Mac がスリープ中なら起きたときに実行</div></div></div>`;
+    h += N.editLimit
+      ? `<div class="nlimit"><label for="nlimIn">1日に変換する上限</label>
+          <input id="nlimIn" type="number" inputmode="numeric" min="0" max="500" step="1" value="${limit}"> 冊
+          <button class="tb main" data-lim="save">保存</button><button class="tb" data-lim="cancel">やめる</button>
+          <span class="h">0 にすると上限なし。次の実行（${nextRun()}）から反映します。今日すでに変換した冊数も数えます。</span>
+          <span class="err" id="nlimErr" role="alert"></span></div>`
+      : `<div class="nlimit"><span>1日に変換する上限</span><b>${limitText(limit)}</b>
+          <button class="tb" data-lim="edit">変更</button>
+          ${S.settings == null ? '<span class="h">設定を読み込めなかったため、Mac の設定（config.json）の値を表示しています。</span>' : ""}</div>`;
 
     if (runs.length) {
       const r = runs[Math.min(N.sel, runs.length - 1)];
@@ -1696,7 +1758,26 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     } else if (!navigator.onLine) h += `<p class="nnote">オフラインのため、最新の状況を読み込めませんでした。</p>`;
     el.innerHTML = h;
   }
-  $("#night").addEventListener("click", e => { const r = e.target.closest("[data-run]"); if (r) { N.sel = Number(r.dataset.run); renderNight(); } });
+  $("#night").addEventListener("click", async e => {
+    const r = e.target.closest("[data-run]");
+    if (r) { N.sel = Number(r.dataset.run); renderNight(); return; }
+    const b = e.target.closest("[data-lim]");
+    if (!b) return;
+    if (b.dataset.lim === "edit") { N.editLimit = true; renderNight(); $("#nlimIn")?.focus(); $("#nlimIn")?.select(); return; }
+    if (b.dataset.lim === "cancel") { N.editLimit = false; renderNight(); return; }
+    const v = Number($("#nlimIn").value);
+    if (!Number.isInteger(v) || v < 0 || v > 500) { $("#nlimErr").textContent = "0〜500 の整数で入れてください。"; return; }
+    b.disabled = true; b.textContent = "保存しています…";
+    try {
+      await saveSettings({ daily_limit:v });
+      N.editLimit = false; renderNight();
+      status(`1日の上限を${limitText(v)}にしました。${nextRun()}の実行から反映します`); setTimeout(() => status(""), 6000);
+    } catch (err) { b.disabled = false; b.textContent = "保存"; $("#nlimErr").textContent = err.message; }
+  });
+  $("#night").addEventListener("keydown", e => {
+    if (e.target.id === "nlimIn" && e.key === "Enter") { e.preventDefault(); $("#night").querySelector('[data-lim="save"]')?.click(); }
+    if (e.target.id === "nlimIn" && e.key === "Escape") { N.editLimit = false; renderNight(); }
+  });
 
   /* ================= 読書の記録（続きから・読了・読書時間）と端末間の同期 ================= */
   const RS_KEY = "shoko.rstate", BIO = "shoko.bio", OPT = "shoko.opts";
@@ -2421,7 +2502,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
   /* ================= 8. 挿絵と図（Mac が images/<本のID>/ に暗号化して置く） ================= */
   S.imgs = new Map();
-  const FIG = { urls:new Map(), busy:0, queue:[] };
+  const FIG = { urls:new Map(), sha:new Map(), busy:0, queue:[] };
   async function loadImages(bid) {
     if (S.imgs.has(bid)) return S.imgs.get(bid);
     let v = null;
@@ -2429,15 +2510,95 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       const r = await fetch(apiURL(`books/${encodeURIComponent(bid)}/images.json.age`), { headers:{ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
       if (r.ok) v = JSON.parse(await dec.decrypt(new Uint8Array(await r.arrayBuffer()), "text"));
     } catch {}
+    if (v?.images?.length) await loadHidden(bid).catch(() => {});
     S.imgs.set(bid, v);
     return v;
   }
+
+  /* 消した図：書庫で「この図を消す」を選んだもの。hidden/<本のID>.json.age に置き、
+     Mac も本を作り直すときにこの一覧の図を外す。図は画像の中身のハッシュ（sha）で見分ける */
+  S.hidden = new Map();
+  async function loadHidden(bid, force) {
+    if (!force && S.hidden.has(bid)) return S.hidden.get(bid);
+    const h = { items:[], sha:null };
+    const r = await fetch(apiURL(`hidden/${encodeURIComponent(bid)}.json.age`), { cache:"no-store", headers:apiHeaders() });
+    if (r.ok) {
+      const j = await r.json(); h.sha = j.sha;
+      h.items = JSON.parse(await dec.decrypt(unb64(String(j.content || "").replace(/\s/g, "")), "text")).items || [];
+    } else if (r.status !== 404) throw new Error("消した図の一覧を読めませんでした（" + r.status + "）。");
+    S.hidden.set(bid, h);
+    return h;
+  }
+  // 古い一覧（Mac が sha を書く前）の図は、置き場所（src）で見分ける
+  const isHidden = (bid, x) => (S.hidden.get(bid)?.items || []).some(i => x.sha ? i.sha === x.sha : i.src === x.src);
+  async function updateHidden(bid, op, message) {
+    if (!navigator.onLine) throw new Error("オフラインのため保存できません。通信できる所で操作してください。");
+    for (let tries = 0; tries < 3; tries++) {
+      const h = await loadHidden(bid, tries > 0);   // 別の端末と同時に変えていたら読み直してやり直す
+      const items = op(h.items.slice());
+      const e = new AgeLib.Encrypter();
+      e.addRecipient(await AgeLib.identityToRecipient(secret.key));
+      const ct = await e.encrypt(JSON.stringify({ v:1, items, updated:new Date().toISOString() }));
+      const body = { message, content:b64big(ct) };
+      if (h.sha) body.sha = h.sha;
+      const r = await fetch(apiURL(`hidden/${encodeURIComponent(bid)}.json.age`), { method:"PUT", headers:{ ...apiHeaders(), "Content-Type":"application/json" }, body:JSON.stringify(body) });
+      if (r.status === 409 || r.status === 422) continue;
+      if (r.status === 403 || r.status === 404) throw new Error("保存できません。トークンの Contents の権限を「Read and write」にしてください。");
+      if (!r.ok) throw new Error("保存に失敗しました（" + r.status + "）。");
+      S.hidden.set(bid, { items, sha:(await r.json()).content?.sha || null });
+      return;
+    }
+    throw new Error("別の端末で同時に変更されたため保存できませんでした。もう一度操作してください。");
+  }
+  async function shaHex(bytes) {
+    const d = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    return [...d].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  }
+  // 今の章を描き直す（今読んでいる所はそのまま）
+  function refigure() { if (!L) return; S.anchor = L.scroll ? null : anchorAt(); relayout(true); }
+
+  stage().addEventListener("click", e => {
+    const f = e.target.closest(".fig[data-src]");
+    if (!f || !getSelection().isCollapsed) return;
+    e.stopImmediatePropagation();                 // ページめくりや帯の表示より先に受け取る
+    showPop(`<h3>図</h3><p style="margin:0;font-size:13px;color:var(--muted)">文字の部分や飾りが誤って図として切り出されたときは、本文から外せます。</p>
+      <div style="display:flex;gap:8px;margin-top:12px"><span style="flex:1"></span><button class="tb main" data-figdel="${esc(f.dataset.src)}">この図を消す</button></div>`, f);
+  }, true);
+  $("#pop").addEventListener("click", async e => {
+    const b = e.target.closest("[data-figdel]");
+    if (!b) return;
+    const bid = S.cur?.bid, src = b.dataset.figdel;
+    const x = S.imgs.get(bid)?.images?.find(i => i.src === src);
+    if (!x) return hidePop();
+    b.disabled = true; b.textContent = "消しています…";
+    try {
+      if (!x.sha && !FIG.sha.has(src)) await figUrl(src, x.type || "image/jpeg");
+      const sha = x.sha || FIG.sha.get(src);
+      await updateHidden(bid, items => [...items.filter(i => i.sha !== sha), { sha, src, at:Date.now() }], "図を消す");
+      hidePop(); refigure();
+      figToast("図を消しました", async () => {
+        await updateHidden(bid, items => items.filter(i => i.sha !== sha), "図を戻す");
+        refigure();
+      });
+    } catch (err) { b.disabled = false; b.textContent = "この図を消す"; figToast(err.message); }
+  });
+  let ftT = 0, ftUndo = null;
+  function figToast(msg, undo) {
+    const t = $("#ftoast"); clearTimeout(ftT);
+    $("#ftoastMsg").textContent = msg; ftUndo = undo || null; $("#ftoastUndo").hidden = !undo;
+    t.hidden = false; ftT = setTimeout(() => { t.hidden = true; ftUndo = null; }, undo ? 7000 : 5000);
+  }
+  $("#ftoastUndo").onclick = async () => {
+    const u = ftUndo; if (!u) return;
+    ftUndo = null; $("#ftoastUndo").hidden = true; $("#ftoastMsg").textContent = "戻しています…";
+    try { await u(); figToast("図を戻しました"); } catch (err) { figToast(err.message); }
+  };
   // この章の挿絵（「どの段落のあとか」の番号の順。段落が本文から消えていても、その位置に置く）
   function figuresFor(ch) {
     const man = S.imgs.get(S.cur?.bid);
     if (!man?.images?.length) return [];
     const pre = `c${ch.no}-b`;
-    return man.images.filter(x => String(x.after).startsWith(pre))
+    return man.images.filter(x => String(x.after).startsWith(pre) && !isHidden(S.cur.bid, x))
       .map(x => ({ ...x, n:Number(String(x.after).slice(pre.length)) || 0 })).sort((a, b) => a.n - b.n)
       .map(x => ({ ...x, n:x.n + .5 }));           // 段落 n のあと → n より大きく n+1 より小さい
   }
@@ -2454,7 +2615,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     if (FIG.urls.has(src)) return FIG.urls.get(src);
     const r = await fetch(apiURL(src), { headers:{ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28" } });
     if (!r.ok) throw new Error(String(r.status));
-    const u = URL.createObjectURL(new Blob([await dec.decrypt(new Uint8Array(await r.arrayBuffer()))], { type }));
+    const bytes = await dec.decrypt(new Uint8Array(await r.arrayBuffer()));
+    FIG.sha.set(src, await shaHex(bytes));        // 「この図を消す」で使う（Mac が付ける sha と同じ計算）
+    const u = URL.createObjectURL(new Blob([bytes], { type }));
     FIG.urls.set(src, u);
     return u;
   }
