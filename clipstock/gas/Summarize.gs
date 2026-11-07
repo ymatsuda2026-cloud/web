@@ -6,10 +6,11 @@
  *   GEMINI_MODEL     省略時 gemini-2.5-flash
  *   APPLY_CONTEXT    応用の切り口(省略可。例: 「受託開発・SES・保守運用の現場」)
  *
- * Code.gs の doPost の switch に次の3行を足す(SETUP.md 参照):
+ * Code.gs の doPost の switch に次の2行を足す(SETUP.md 参照):
  *   case 'summarize':     result = csSummarize_(body.pageId, body.source); break;
- *   case 'claudePrompt':  result = csClaudePrompt_(body.pageId, body.source); break;
  *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source); break;
+ *
+ * (Claude.ai に貼るプロンプトは ClipStock の画面側で作る。ここでは作らない)
  *
  * 流れ: 文字起こしを Notion から読む → Gemini で5段(サマリ/マインドマップ/分野別/応用/活用)
  *       → 時刻は AI に答えさせず、引用を原文から探して付ける → saveGenerated_ で書き戻す
@@ -67,36 +68,6 @@ function csSummarize_(pageId, source) {
 
   saveGenerated_(pageId, out, model, transcript.length, source);
   return { detail: out, model: model, rawCount: transcript.length, failed: failed, generatedAt: new Date().toISOString() };
-}
-
-/** Claude.ai に貼る用のプロンプト(文字起こし込み、返答は1つのJSON) */
-function csClaudePrompt_(pageId, source) {
-  var detail = csDetail_(pageId, source);
-  var transcript = String(csTranscript_(pageId, source) || '').slice(0, CS_TRANSCRIPT_LIMIT);
-  if (!transcript.trim()) throw new Error('文字起こしがありません');
-  var timed = csHasTimecodes_(transcript);
-  var lines = [
-    '次の動画(または記事)の文字起こしを読み、下の形式のJSONだけを返してください。',
-    '前後の説明文やコードフェンス(```)は付けず、日本語で書いてください。',
-    '',
-    '{',
-    '  "summary": "5〜8文のサマリ。何の話か・結論・押さえる点。箇条書きにしない",',
-    '  "mindmap": { "title": "主題", "branches": [ { "label": "大項目", "quote": "", "children": [ { "label": "小項目", "quote": "", "children": [] } ] } ] },',
-    '  "fields": [ { "name": "分野名", "summary": "1〜2文", "points": [ ' + (timed ? '{ "text": "具体的な事実・数値・手順を1行で", "quote": "根拠の原文を一字一句そのまま" }' : '"具体的な事実・数値・手順を1行で"') + ' ] } ],',
-    '  "apply": [ { "title": "応用案の題", "summary": "どう使うか1〜2文", "steps": ["最初の一歩", "次の一歩"] } ],',
-    '  "ideas": [ { "title": "活用アイデアの題", "summary": "面白い・意外な使い方1〜2文" } ]',
-    '}',
-    '',
-    '決まり:',
-    '- mindmap は大項目4〜7、各2〜5の子、深さは最大3。',
-    '- 分野は2〜5。points は各2〜5件。apply は2〜4件、ideas は3〜5件。',
-    '- 文字起こしに書かれていないことを足さない。',
-  ];
-  if (timed) {
-    lines.push('- quote は文字起こしに実在する文字列を20〜60字で一字一句そのまま写す。言い換えない。該当が無い項目は空文字。');
-    lines.push('- 時刻や秒数は書かない(こちらで原文から割り出す)。');
-  }
-  return '動画タイトル: ' + detail.title + '\n\n----------------\n\n' + lines.join('\n') + '\n\n----------------\n\n' + transcript;
 }
 
 /** Claude.ai が返したJSONを取り込んで保存する */
