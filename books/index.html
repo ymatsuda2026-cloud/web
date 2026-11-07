@@ -110,7 +110,7 @@ a.hb{display:inline-flex; align-items:center; text-decoration:none}
 .vert .two .s1{background-image:linear-gradient(to left, var(--gut), transparent 34px)}
 .vp{position:absolute; overflow:hidden; left:var(--ml); top:var(--mt); width:var(--tw); height:var(--th)}
 .flow{width:var(--tw); height:var(--th); column-width:var(--tw); column-gap:var(--cg); column-fill:auto;
-  font-family:var(--serif); font-size:var(--fs); line-height:1.9}
+  font-family:var(--bodyfont, var(--serif)); font-size:var(--fs); line-height:1.9}
 .vert .flow{writing-mode:vertical-rl; column-width:var(--th); line-height:1.8}
 .runhead{position:absolute; top:calc(var(--mt) * .4); left:var(--ml); right:var(--ml); font-size:10.5px; color:var(--bunko-muted);
   letter-spacing:.12em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -268,6 +268,14 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 .mm .nd{border:1px solid var(--line); background:var(--sheet); border-radius:12px; padding:2px 10px; font-size:13px; line-height:1.6; color:var(--ink); text-align:left}
 .mm .nd.root{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth)}
 .optrow{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px}
+.optrow.col{flex-direction:column; align-items:stretch}
+.fontpick{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin-top:6px; max-height:46vh; overflow:auto}
+.fontpick button{text-align:left; border:1px solid var(--line); background:var(--sheet); color:var(--ink); border-radius:6px; padding:7px 9px; cursor:pointer; font:inherit}
+.fontpick button[aria-pressed="true"]{border-color:var(--foil); box-shadow:0 0 0 1px var(--foil) inset; background:var(--foil-soft, rgba(169,130,42,.12))}
+.fontpick button:focus-visible{outline:2px solid var(--foil); outline-offset:1px}
+.fontpick .fn{display:block; font-size:12px; color:var(--muted); font-family:var(--sans)}
+.fontpick .fs{display:block; font-size:17px; line-height:1.5; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.fontpick .fk{font-size:10.5px; color:var(--muted); font-family:var(--sans); margin-left:4px}
 .optrow:last-child{border-bottom:0}
 .optrow .lb{flex:1}
 .optrow .note{display:block; font-size:12px; color:var(--muted)}
@@ -278,7 +286,7 @@ body.imm .scrubtip{bottom:auto; top:calc(100% + 6px)}
 .scroller{position:relative; flex:none; width:100%; height:100%; overflow:auto; background:var(--desk); overscroll-behavior:contain; scrollbar-width:thin; -webkit-overflow-scrolling:touch; outline:none}
 .scroller.h{touch-action:pan-y}
 .scroller.v{writing-mode:vertical-rl; touch-action:pan-x; background:var(--bunko)}
-#reader .flow.sc{columns:auto; column-width:auto; column-gap:0; width:auto; height:auto; box-sizing:border-box; background:var(--bunko); color:var(--bunko-ink); font-family:var(--serif); font-size:var(--fs); line-height:1.9}
+#reader .flow.sc{columns:auto; column-width:auto; column-gap:0; width:auto; height:auto; box-sizing:border-box; background:var(--bunko); color:var(--bunko-ink); font-family:var(--bodyfont, var(--serif)); font-size:var(--fs); line-height:1.9}
 .scroller.h .flow.sc{width:min(100%,40em); margin:0 auto; min-height:100%; padding:calc(env(safe-area-inset-top,0px) + 40px) var(--spx) 120px; box-shadow:0 0 0 1px var(--bunko-rule)}
 .scroller.v .flow.sc{writing-mode:vertical-rl; line-height:1.8; margin-inline:auto; padding-inline:var(--spx); padding-block:48px 120px}
 .chs + .chs{margin-block-start:3.2em}
@@ -1176,7 +1184,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
      ページ数は画面の大きさ・文字の大きさ・縦横で変わるので、その組み合わせごとに
      各章を見えない所で組んで数え、前の章までのページ数を足して通し番号にする */
   const PM = { key:null, counts:new Map(), tok:0 };
-  const pmKey = () => L && !L.scroll && S.cur ? [S.cur.bid, L.pw, L.ph, S.fs, S.vert ? 1 : 0].join("|") : null;
+  const pmKey = () => L && !L.scroll && S.cur ? [S.cur.bid, L.pw, L.ph, S.fs, S.vert ? 1 : 0, O.font || ""].join("|") : null;
   function notePages() {
     const k = pmKey();
     if (PM.key !== k) { PM.key = k; PM.counts = new Map(); }
@@ -1942,6 +1950,12 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     if (r) { hidePop(); return jump(r.dataset.ref); }
     const so = e.target.closest("[data-scrollopt]");
     if (so) { setScroll(!S.scroll); so.setAttribute("aria-pressed", String(!!S.scroll)); so.textContent = S.scroll ? "あり" : "なし"; return; }
+    const fb = e.target.closest("[data-font]");
+    if (fb) {
+      O.font = fb.dataset.font; ls.set(OPT, O); applyFont(true);
+      document.querySelectorAll("[data-font]").forEach(b => b.setAttribute("aria-pressed", String(b === fb)));
+      return;
+    }
     const o = e.target.closest("[data-opt]");
     if (o) { const k = o.dataset.opt; O[k] = !O[k]; ls.set(OPT, O); o.setAttribute("aria-pressed", String(O[k])); o.textContent = O[k] ? "あり" : "なし"; if (k === "kp" && L) relayout(true); return; }
     if (e.target.closest("[data-bioon]")) return bioSetup(e.target.closest("[data-bioon]"));
@@ -2025,6 +2039,39 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     return r;
   };
 
+  /* ---------- 本文のフォント（端末ごとに覚える） ---------- */
+  const MIN_FB = '"Hiragino Mincho ProN","Yu Mincho","YuMincho",serif';
+  const GO_FB = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","YuGothic",sans-serif';
+  const FONTS = [
+    { id:"shippori", name:"しっぽり明朝", fam:'"Shippori Mincho"', fb:MIN_FB, kind:"明朝", note:"活版の味わい" },
+    { id:"bizmin", name:"BIZ UDP明朝", fam:'"BIZ UDPMincho"', gf:"BIZ+UDPMincho:wght@400;700", fb:MIN_FB, kind:"明朝", note:"画面で読みやすい" },
+    { id:"notoserif", name:"Noto Serif JP", fam:'"Noto Serif JP"', gf:"Noto+Serif+JP:wght@400;600", fb:MIN_FB, kind:"明朝", note:"癖のない標準" },
+    { id:"zenold", name:"Zen Old Mincho", fam:'"Zen Old Mincho"', gf:"Zen+Old+Mincho:wght@400;600", fb:MIN_FB, kind:"明朝", note:"文庫本の雰囲気" },
+    { id:"bizgo", name:"BIZ UDPゴシック", fam:'"BIZ UDPGothic"', gf:"BIZ+UDPGothic:wght@400;700", fb:GO_FB, kind:"ゴシック", note:"読みやすさ第一" },
+    { id:"notosans", name:"Noto Sans JP", fam:'"Noto Sans JP"', gf:"Noto+Sans+JP:wght@400;500", fb:GO_FB, kind:"ゴシック", note:"落ち着いた標準" },
+    { id:"zenkaku", name:"Zen Kaku Gothic New", fam:'"Zen Kaku Gothic New"', fb:GO_FB, kind:"ゴシック", note:"すっきり細め" },
+    { id:"klee", name:"Klee One", fam:'"Klee One"', gf:"Klee+One:wght@400;600", fb:MIN_FB, kind:"教科書体", note:"手書きのような柔らかさ" },
+    { id:"sysmin", name:"端末の明朝", fam:"", fb:MIN_FB, kind:"明朝", note:"ヒラギノ・游明朝。読み込みなし" },
+    { id:"sysgo", name:"端末のゴシック", fam:"", fb:GO_FB, kind:"ゴシック", note:"ヒラギノ・游ゴシック。読み込みなし" },
+  ];
+  const fontOf = id => FONTS.find(f => f.id === id) || FONTS[0];
+  const fontStack = f => (f.fam ? f.fam + "," : "") + f.fb;
+  const gfLoaded = new Set();
+  function loadFont(f) {                     // Google Fonts は選んだ（見本を出した）ものだけ読み込む
+    if (!f.gf || gfLoaded.has(f.gf)) return;
+    gfLoaded.add(f.gf);
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = `https://fonts.googleapis.com/css2?family=${f.gf}&display=swap`;
+    document.head.appendChild(l);
+  }
+  function applyFont(relay) {
+    const f = fontOf(O.font);
+    loadFont(f);
+    document.documentElement.style.setProperty("--bodyfont", fontStack(f));
+    if (relay && L) relayout(true);          // 文字の形が届いたら loadingdone でもう一度組み直す
+  }
+  applyFont(false);                          // 起動時：この端末で選んであるフォントにする
+
   // 設定の小窓
   $("#optBtn").onclick = e => {
     const bioOk = !!(window.PublicKeyCredential && navigator.credentials && isSecureContext);
@@ -2033,6 +2080,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       <div class="optrow"><span class="lb">スクロールで読む<span class="note">ページをめくる代わりに、章をまたいで続けて読みます</span></span><button class="tb" data-scrollopt="1" aria-pressed="${!!S.scroll}">${S.scroll ? "あり" : "なし"}</button></div>
       <div class="optrow"><span class="lb">めくりの動き<span class="note">ページ表示のとき</span></span>${yn("anim")}</div>
       <div class="optrow"><span class="lb">章の冒頭に要点<span class="note">要約がある章だけ</span></span>${yn("kp")}</div>
+      <div class="optrow col"><span class="lb">本文のフォント<span class="note">この端末で覚えます</span></span>
+        <div class="fontpick" role="group" aria-label="本文のフォント">${FONTS.map(f => { loadFont(f);
+          return `<button type="button" data-font="${f.id}" aria-pressed="${fontOf(O.font).id === f.id}"><span class="fn">${esc(f.name)}<span class="fk">${esc(f.kind)}・${esc(f.note)}</span></span><span class="fs" style='font-family:${fontStack(f)}'>吾輩は猫である。名前はまだ無い。</span></button>`; }).join("")}</div></div>
       <div class="optrow"><span class="lb">Face ID・Touch ID で開く<span class="note">${bioOk ? (ls.get(BIO, null) ? "この端末で使えるようになっています" : "合言葉の代わりに使えます") : "この端末・ブラウザでは使えません"}</span></span>
         ${bioOk ? (ls.get(BIO, null) ? '<button class="tb" data-biooff="1">やめる</button>' : '<button class="tb" data-bioon="1">設定する</button>') : ""}</div>
       <div id="bioForm"></div>`, e.currentTarget);
