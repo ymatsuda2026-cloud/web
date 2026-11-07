@@ -1487,6 +1487,14 @@ details.mm[open]>summary::before{content:"▾ "}
       if (/JSON/.test(m)) say("つながりました。共有トークンも、要約の窓口（Summarize.gs）も正常です。");
       else if (/Summarize\.gs/.test(m)) say("窓口にはつながりましたが、Summarize.gs が入っていないか、デプロイが古いままです。\n「デプロイを管理」→ 編集 → 新しいバージョン、で更新してください。（マーカー・メモの保存だけなら動きます）");
       else if (/共有トークン/.test(m)) say("窓口にはつながりましたが、共有トークンが違います。GAS のスクリプトプロパティ ACCESS_TOKEN と同じ値で、設定をやり直してください。");
+      else if (/つながりませんでした/.test(m)) {
+        // 応答を読めない理由を切り分ける: no-cors なら、サーバーが何かを返しただけで「届いた」と分かる
+        let reach = false;
+        try { await fetch(secret.gas + (secret.gas.includes("?") ? "&" : "?") + "r=" + Date.now().toString(36), { mode: "no-cors", cache: "no-store" }); reach = true; } catch {}
+        say(reach
+          ? "窓口のサーバーには届いていますが、ブラウザが応答を受け取れません。多くは次のどれかです。\n① GAS の承認がまだ：エディタで関数を1回実行して、権限を承認する（SETUP の「承認」）\n② アーカイブ済み・古いデプロイの URL を登録している：「デプロイを管理」の有効なデプロイの URL にする\n③ Google が一時的に失敗している：少し待ってもう一度"
+          : "窓口のサーバーに届きません。ネットワーク接続と、登録した URL の綴り（https://script.google.com/macros/s/…/exec）を確認してください。");
+      }
       else say(m);
     }
     $("#mPing").disabled = false;
