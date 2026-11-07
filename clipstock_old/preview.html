@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>動画ナレッジ — 画面プレビュー</title>
+<link rel="stylesheet" href="./css/styles.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+<style>
+  /* プレビュー専用。3画面を縦に並べて見るためだけのもの */
+  body { background: #e6e3db; }
+  .preview-note { max-width: 900px; margin: 26px auto 8px; padding: 0 16px; font-size: 13px; color: #5f5e5a; }
+  .preview-note h1 { font-size: 17px; color: #2c2c2a; margin: 0 0 4px; }
+  .preview-note h2 { font-size: 14px; color: #2c2c2a; margin: 0 0 3px; }
+  .frame { max-width: 900px; margin: 0 auto 30px; border: 0.5px solid rgba(0,0,0,.18); border-radius: 12px; overflow: hidden; background: #f1efe8; box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+  .frame .app { height: 620px; }
+</style>
+</head>
+<body>
+
+<div class="preview-note">
+  <h1>動画ナレッジ — 画面プレビュー</h1>
+  <p>実際のスタイルシート(css/styles.css)をそのまま読み込んだ静的プレビューです。データは仮のものです。</p>
+</div>
+
+<div class="preview-note"><h2>ライブラリ</h2>
+<p>サムネイルが主役。カードの点は左から サマリ / マインドマップ / 分野別 / 応用 / 活用 の生成状況。まだ開いていないものは左端に線が付きます。</p></div>
+<div class="frame"><div class="app">
+  <header class="topbar">
+    <i class="ti ti-movie brand-icon"></i>
+    <span class="brand">動画ナレッジ</span>
+    <span class="foot-note">6件</span>
+    <div class="topbar-scroll">
+      <div class="search"><i class="ti ti-search"></i><input class="search-input" placeholder="タイトルと要約を検索" /></div>
+      <div class="chip-row">
+        <button class="chip">新規<span class="chip-count">1</span></button>
+        <button class="chip">処理中<span class="chip-count">1</span></button>
+        <button class="chip">完了<span class="chip-count">1</span></button>
+        <button class="chip">要約済み<span class="chip-count">3</span></button>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-ghost on"><i class="ti ti-tag"></i></button>
+      <button class="btn-ghost"><i class="ti ti-refresh"></i></button>
+      <button class="btn-ghost"><i class="ti ti-sparkles"></i></button>
+      <button class="btn-ghost"><i class="ti ti-messages"></i></button>
+      <button class="btn-ghost"><i class="ti ti-settings"></i></button>
+      <button class="model-switch">AI: gemini-2.5-flash</button>
+    </div>
+  </header>
+  <nav class="viewtabs">
+    <button class="viewtab on"><i class="ti ti-layout-grid"></i>ライブラリ</button>
+    <button class="viewtab "><i class="ti ti-bulb"></i>アイデア</button>
+  </nav><div id="tag-rail">
+    <div class="tag-rail">
+      
+      <button class="chip  " data-tag="AI" >
+            AI<span class="chip-count">12</span>
+          </button><button class="chip  " data-tag="自動化" >
+            自動化<span class="chip-count">7</span>
+          </button><button class="chip  " data-tag="個人開発" >
+            個人開発<span class="chip-count">5</span>
+          </button><button class="chip  " data-tag="経営" >
+            経営<span class="chip-count">4</span>
+          </button><button class="chip  " data-tag="Notion" >
+            Notion<span class="chip-count">3</span>
+          </button><button class="chip  " data-tag="機械学習" >
+            機械学習<span class="chip-count">2</span>
+          </button>
+    </div>
+  </div><main class="stage">
+    <div class="grid">
+      
+        <article class="card unseen" data-key="v1" tabindex="0">
+          <div class="thumb "><img src="https://i.ytimg.com/vi/aaaaaaaaaaa/mqdefault.jpg" alt="" loading="lazy" /></div>
+          <div class="card-body">
+            <h3 class="card-title">Transformerの仕組みを1時間で完全理解する</h3>
+            <p class="card-summary">Attention機構を軸に、系列変換モデルがRNNから置き換わった経緯を追う。Q・K・Vの内積で語同士の関連を取る仕組みと、位置エンコーディングの必要性を図で追いながら説明している。</p>
+            <div class="card-foot">
+              <span class="badge s-要約済み">要約済み</span>
+              <span class="dots" title="サマリ:有 / マインドマップ:有 / 分野別:有 / 応用:有 / 活用:有"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i></span>
+              <span class="card-date">2026/8/30</span>
+            </div>
+            <div class="card-tags"><span class="tag">AI</span><span class="tag">機械学習</span></div>
+          </div>
+        </article>
+        <article class="card " data-key="v2" tabindex="0">
+          <div class="thumb "><img src="https://i.ytimg.com/vi/bbbbbbbbbbb/mqdefault.jpg" alt="" loading="lazy" /></div>
+          <div class="card-body">
+            <h3 class="card-title">個人開発で月100万円に到達するまでにやったこと</h3>
+            <p class="card-summary">価格を3回上げた話が中心。最初は無料枠を厚くしすぎて有料転換率が伸びず、機能ではなく「使う時間帯」で線を引いたことが転機だったと振り返る。</p>
+            <div class="card-foot">
+              <span class="badge s-要約済み">要約済み</span>
+              <span class="dots" title="サマリ:有 / マインドマップ:有 / 分野別:有 / 応用:有 / 活用:無"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot "></i></span>
+              <span class="card-date">2026/8/28</span>
+            </div>
+            <div class="card-tags"><span class="tag">個人開発</span><span class="tag">マーケティング</span></div>
+          </div>
+        </article>
+        <article class="card unseen" data-key="v3" tabindex="0">
+          <div class="thumb "><img src="https://i.ytimg.com/vi/ccccccccccc/mqdefault.jpg" alt="" loading="lazy" /></div>
+          <div class="card-body">
+            <h3 class="card-title">発酵の科学 — 味噌と醤油はなぜ違う味になるのか</h3>
+            <p class="card-summary"><span class="muted">要約はまだありません</span></p>
+            <div class="card-foot">
+              <span class="badge s-完了">完了</span>
+              <span class="dots" title="サマリ:無 / マインドマップ:無 / 分野別:無 / 応用:無 / 活用:無"><i class="dot "></i><i class="dot "></i><i class="dot "></i><i class="dot "></i><i class="dot "></i></span>
+              <span class="card-date">2026/8/27</span>
+            </div>
+            
+          </div>
+        </article>
+        <article class="card " data-key="v4" tabindex="0">
+          <div class="thumb "><img src="https://i.ytimg.com/vi/ddddddddddd/mqdefault.jpg" alt="" loading="lazy" /></div>
+          <div class="card-body">
+            <h3 class="card-title">Notion APIで業務を自動化する実践パターン10選</h3>
+            <p class="card-summary">データベースのプロパティ設計から入り、rich_textの2000字制限やselectの自動追加といったAPI固有の癖を、失敗例つきで並べている。</p>
+            <div class="card-foot">
+              <span class="badge s-要約済み">要約済み</span>
+              <span class="dots" title="サマリ:有 / マインドマップ:有 / 分野別:有 / 応用:無 / 活用:無"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot "></i><i class="dot "></i></span>
+              <span class="card-date">2026/8/25</span>
+            </div>
+            <div class="card-tags"><span class="tag">Notion</span><span class="tag">自動化</span></div>
+          </div>
+        </article>
+        <article class="card " data-key="v5" tabindex="0">
+          <div class="thumb "><img src="https://i.ytimg.com/vi/eeeeeeeeeee/mqdefault.jpg" alt="" loading="lazy" /></div>
+          <div class="card-body">
+            <h3 class="card-title">週末だけで作る小屋 — 基礎から屋根まで</h3>
+            <p class="card-summary"><span class="muted">要約はまだありません</span></p>
+            <div class="card-foot">
+              <span class="badge s-新規">新規</span>
+              <span class="dots" title="サマリ:無 / マインドマップ:無 / 分野別:無 / 応用:無 / 活用:無"><i class="dot "></i><i class="dot "></i><i class="dot "></i><i class="dot "></i><i class="dot "></i></span>
+              <span class="card-date">2026/8/24</span>
+            </div>
+            
+          </div>
+        </article>
+        <article class="card " data-key="v6" tabindex="0">
+          <div class="thumb "><img src="https://i.ytimg.com/vi/fffffffffff/mqdefault.jpg" alt="" loading="lazy" /></div>
+          <div class="card-body">
+            <h3 class="card-title">在庫を持たない製造業はどこまで可能か</h3>
+            <p class="card-summary"><span class="muted">要約はまだありません</span></p>
+            <div class="card-foot">
+              <span class="badge s-処理中">処理中</span>
+              <span class="dots" title="サマリ:無 / マインドマップ:無 / 分野別:無 / 応用:無 / 活用:無"><i class="dot "></i><i class="dot "></i><i class="dot "></i><i class="dot "></i><i class="dot "></i></span>
+              <span class="card-date">2026/8/22</span>
+            </div>
+            <div class="card-tags"><span class="tag">経営</span></div>
+          </div>
+        </article>
+    </div>
+  </main></div></div>
+
+<div class="preview-note"><h2>詳細(分野別タブ)</h2>
+<p>タブの小さな空丸は「まだ中身が無い」印。各項目の再生ボタンは、その要点の根拠が原文で確認できた位置です。リンクが無い項目は根拠を特定できなかったもので、時刻を推測して付けることはしません。</p></div>
+<div class="frame"><div class="app">
+  <header class="topbar">
+    <i class="ti ti-movie brand-icon"></i>
+    <span class="brand">動画ナレッジ</span>
+    <span class="foot-note">6件</span>
+    <div class="topbar-scroll">
+      <div class="search"><i class="ti ti-search"></i><input class="search-input" placeholder="タイトルと要約を検索" /></div>
+      <div class="chip-row">
+        <button class="chip">新規<span class="chip-count">1</span></button>
+        <button class="chip">処理中<span class="chip-count">1</span></button>
+        <button class="chip">完了<span class="chip-count">1</span></button>
+        <button class="chip">要約済み<span class="chip-count">3</span></button>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-ghost on"><i class="ti ti-tag"></i></button>
+      <button class="btn-ghost"><i class="ti ti-refresh"></i></button>
+      <button class="btn-ghost"><i class="ti ti-sparkles"></i></button>
+      <button class="btn-ghost"><i class="ti ti-messages"></i></button>
+      <button class="btn-ghost"><i class="ti ti-settings"></i></button>
+      <button class="model-switch">AI: gemini-2.5-flash</button>
+    </div>
+  </header>
+  <nav class="viewtabs">
+    <button class="viewtab on"><i class="ti ti-layout-grid"></i>ライブラリ</button>
+    <button class="viewtab "><i class="ti ti-bulb"></i>アイデア</button>
+  </nav><main class="stage no-scroll">
+    <div class="detail">
+      <div class="detail-fixed">
+    <div class="detail-head">
+      <button class="btn-ghost btn-back" aria-label="一覧に戻る"><i class="ti ti-arrow-left" aria-hidden="true"></i></button>
+      <div class="detail-headline">
+        <h2 class="detail-title">Transformerの仕組みを1時間で完全理解する</h2>
+        <div class="detail-meta">
+          <span class="badge s-要約済み">要約済み</span>
+          <span>2026/8/30</span>
+          <span>原文 48,210字</span>
+          <span class="model-badge">gemini-2.5-flash</span>
+        </div>
+      </div>
+      <a class="btn-ghost" href="https://www.youtube.com/watch?v=aaaaaaaaaaa" target="_blank" rel="noopener" aria-label="YouTubeで開く"><i class="ti ti-external-link" aria-hidden="true"></i></a>
+      <button class="btn-ghost btn-more" aria-label="その他の操作"><i class="ti ti-dots" aria-hidden="true"></i></button>
+    </div>
+    <div class="detail-hero">
+      <a href="https://www.youtube.com/watch?v=aaaaaaaaaaa" target="_blank" rel="noopener"><div class="thumb thumb-hero"><img src="https://i.ytimg.com/vi/aaaaaaaaaaa/mqdefault.jpg" alt="" loading="lazy" /></div></a>
+      <div class="hero-side">
+        <div class="tag-row">
+          <span class="tag tag-edit" data-tag="AI">AI<i class="ti ti-x" aria-hidden="true"></i></span><span class="tag tag-edit" data-tag="機械学習">機械学習<i class="ti ti-x" aria-hidden="true"></i></span>
+          <button class="btn-ghost btn-tag-add" aria-label="タグを追加"><i class="ti ti-plus" aria-hidden="true"></i></button>
+        </div>
+        <button class="btn btn-primary btn-generate-all"><i class="ti ti-sparkles" aria-hidden="true"></i>すべて生成</button>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab " data-tab="summary">サマリ</button><button class="tab " data-tab="mindmap">マインドマップ</button><button class="tab on" data-tab="fields">分野別</button><button class="tab " data-tab="apply">応用</button><button class="tab " data-tab="ideas">活用</button><button class="tab " data-tab="memo">メモ<i class="tab-empty" aria-hidden="true"></i></button><button class="tab " data-tab="chat">チャット<i class="tab-empty" aria-hidden="true"></i></button><button class="tab " data-tab="raw">原文</button>
+    </nav>
+  </div>
+      <div class="detail-scroll" id="detail-scroll"><div class="sections">
+    <section class="sec">
+      <h4 class="sec-head">技術<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=32s" target="_blank" rel="noopener" title="0:32 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>0:32</a></h4>
+      <p class="sec-body">Attentionの計算量と近似手法が主題になっている</p>
+      <ul class="sec-points"><li>QとKの内積で語同士の関連度を取り、Vを重み付けして足す<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=32s" target="_blank" rel="noopener" title="0:32 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>0:32</a></li><li>計算量は系列長の二乗。長文では近似が前提になる<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=65s" target="_blank" rel="noopener" title="1:05 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>1:05</a></li><li>位置エンコーディングが無いと語順の情報が消える<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=754s" target="_blank" rel="noopener" title="12:34 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>12:34</a></li></ul>
+    </section>
+    <section class="sec">
+      <h4 class="sec-head">学習<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=1100s" target="_blank" rel="noopener" title="18:20 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>18:20</a></h4>
+      <p class="sec-body">初学者がつまずく順番に沿って説明されている</p>
+      <ul class="sec-points"><li>行列積の形をまず手で追うと理解が速い<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=1100s" target="_blank" rel="noopener" title="18:20 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>18:20</a></li><li>多頭化は「別の観点で同じ計算をする」と捉えると腑に落ちる</li></ul>
+    </section>
+    <section class="sec">
+      <h4 class="sec-head">実務<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=2462s" target="_blank" rel="noopener" title="41:02 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>41:02</a></h4>
+      <p class="sec-body">自分で実装するより既存実装を読む方が学習効率が高いという立場</p>
+      <ul class="sec-points"><li>HuggingFaceの実装を1ファイル追うのが近道<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=2462s" target="_blank" rel="noopener" title="41:02 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>41:02</a></li><li>推論コストは系列長で決まるので、入力設計が効く<a class="tc tc-link" href="https://www.youtube.com/watch?v=aaaaaaaaaaa&amp;t=2835s" target="_blank" rel="noopener" title="47:15 から再生"><i class="ti ti-player-play" aria-hidden="true"></i>47:15</a></li></ul>
+    </section></div></div>
+      <div class="detail-foot"><button class="btn btn-regen" data-stage="fields"><i class="ti ti-refresh" aria-hidden="true"></i>この項目を作り直す</button>
+           <button class="btn btn-edit-field"><i class="ti ti-edit" aria-hidden="true"></i>手で直す</button>
+           <span class="grow"></span>
+           
+           <button class="btn btn-copy"><i class="ti ti-copy" aria-hidden="true"></i>コピー</button></div>
+    </div>
+  </main></div></div>
+
+<div class="preview-note"><h2>アイデア</h2>
+<p>応用と活用アイデアを動画をまたいで1本のフィードにした画面。下の動画名から元の動画へ戻れます。</p></div>
+<div class="frame"><div class="app">
+  <header class="topbar">
+    <i class="ti ti-movie brand-icon"></i>
+    <span class="brand">動画ナレッジ</span>
+    <span class="foot-note">6件</span>
+    <div class="topbar-scroll">
+      <div class="search"><i class="ti ti-search"></i><input class="search-input" placeholder="タイトルと要約を検索" /></div>
+      <div class="chip-row">
+        <button class="chip">新規<span class="chip-count">1</span></button>
+        <button class="chip">処理中<span class="chip-count">1</span></button>
+        <button class="chip">完了<span class="chip-count">1</span></button>
+        <button class="chip">要約済み<span class="chip-count">3</span></button>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-ghost on"><i class="ti ti-tag"></i></button>
+      <button class="btn-ghost"><i class="ti ti-refresh"></i></button>
+      <button class="btn-ghost"><i class="ti ti-sparkles"></i></button>
+      <button class="btn-ghost"><i class="ti ti-messages"></i></button>
+      <button class="btn-ghost"><i class="ti ti-settings"></i></button>
+      <button class="model-switch">AI: gemini-2.5-flash</button>
+    </div>
+  </header>
+  <nav class="viewtabs">
+    <button class="viewtab "><i class="ti ti-layout-grid"></i>ライブラリ</button>
+    <button class="viewtab on"><i class="ti ti-bulb"></i>アイデア</button>
+  </nav><div id="tag-rail">
+    <div class="tag-rail">
+      
+      <button class="chip  " data-tag="AI" >
+            AI<span class="chip-count">12</span>
+          </button><button class="chip  " data-tag="自動化" >
+            自動化<span class="chip-count">7</span>
+          </button><button class="chip  " data-tag="個人開発" >
+            個人開発<span class="chip-count">5</span>
+          </button><button class="chip  " data-tag="経営" >
+            経営<span class="chip-count">4</span>
+          </button><button class="chip  " data-tag="Notion" >
+            Notion<span class="chip-count">3</span>
+          </button><button class="chip  " data-tag="機械学習" >
+            機械学習<span class="chip-count">2</span>
+          </button>
+    </div>
+  </div><main class="stage">
+    <div class="idea-toolbar">
+      <div class="seg">
+        <button class="seg-btn on" data-kind="all">すべて</button>
+        <button class="seg-btn " data-kind="apply">ビジネス</button>
+        <button class="seg-btn " data-kind="ideas">面白い活用</button>
+      </div>
+      <button class="btn btn-shuffle"><i class="ti ti-dice" aria-hidden="true"></i>掘り起こす</button>
+    </div>
+    <div class="idea-feed">
+      
+        <article class="idea" data-key="v1">
+          <div class="idea-kind apply">ビジネス</div>
+          <h4 class="idea-title">社内文書の検索を意味ベースに置き換える</h4>
+          <p class="idea-body">キーワード一致では拾えない言い換えを、埋め込みの近さで拾えるようにする</p>
+          <ul class="sec-points"><li>議事録DBを埋め込みに変換して精度を比べる</li><li>届かない場合はチャンクの切り方を変える</li></ul>
+          <button class="idea-source">
+            <i class="ti ti-movie" aria-hidden="true"></i>Transformerの仕組みを1時間で完全理解する
+          </button>
+        </article>
+        <article class="idea" data-key="v1">
+          <div class="idea-kind ideas">活用</div>
+          <h4 class="idea-title">議事録を寝る前の音声にする</h4>
+          <p class="idea-body">要約を読み上げに回して流し聞きする</p>
+          
+          <button class="idea-source">
+            <i class="ti ti-movie" aria-hidden="true"></i>Transformerの仕組みを1時間で完全理解する
+          </button>
+        </article>
+        <article class="idea" data-key="v2">
+          <div class="idea-kind apply">ビジネス</div>
+          <h4 class="idea-title">無料枠の線を機能から時間帯に引き直す</h4>
+          <p class="idea-body">機能制限ではなく利用時間で分けると、業務利用だけが有料に寄る</p>
+          <ul class="sec-points"><li>現行プランの利用ログを時間帯で切って分布を見る</li></ul>
+          <button class="idea-source">
+            <i class="ti ti-movie" aria-hidden="true"></i>個人開発で月100万円に到達するまでにやったこと
+          </button>
+        </article>
+        <article class="idea" data-key="v2">
+          <div class="idea-kind ideas">活用</div>
+          <h4 class="idea-title">値上げの履歴だけを並べたページを作る</h4>
+          <p class="idea-body">意思決定の経緯を残すと、次の値上げで迷わなくなる</p>
+          
+          <button class="idea-source">
+            <i class="ti ti-movie" aria-hidden="true"></i>個人開発で月100万円に到達するまでにやったこと
+          </button>
+        </article>
+        <article class="idea" data-key="v4">
+          <div class="idea-kind apply">ビジネス</div>
+          <h4 class="idea-title">週報の下書きをDBから自動生成する</h4>
+          <p class="idea-body">今週更新されたページを集めて、担当ごとに束ねた下書きを作る</p>
+          <ul class="sec-points"><li>last_edited_time で絞る問い合わせを1本書く</li><li>出力先を下書き用DBにして人が最後に直す</li></ul>
+          <button class="idea-source">
+            <i class="ti ti-movie" aria-hidden="true"></i>Notion APIで業務を自動化する実践パターン10選
+          </button>
+        </article>
+    </div>
+  </main></div></div>
+
+</body>
+</html>
