@@ -367,6 +367,7 @@ details.mm[open]>summary::before{content:"▾ "}
     <button class="tb main" id="mGo" disabled>選択を要約する</button>
     <button class="tb" id="mClaude">Claude.ai で要約</button>
     <button class="tb" id="mPing">窓口の接続を確かめる</button>
+    <button class="tb" id="mOpenGas">窓口の URL を開く</button>
   </div>
   <p class="mnote" id="mnote"></p>
   <div class="mlist" id="mlist"></div>
@@ -1477,23 +1478,26 @@ details.mm[open]>summary::before{content:"▾ "}
     ids.forEach(id => all ? S.sel.delete(id) : S.sel.add(id)); drawManage();
   });
   $("#mClaude").addEventListener("click", () => claudeDialog());
+  $("#mOpenGas").addEventListener("click", () => { if (secret.gas) window.open(secret.gas, "_blank", "noopener,noreferrer"); else $("#mnote").textContent = "要約の窓口（GAS）が登録されていません。"; });
   $("#mPing").addEventListener("click", async () => {
     const say = t => { $("#mnote").textContent = t; };
     if (!secret.gas) return say("要約の窓口（GAS）が登録されていません。「🔒 鍵」→ 設定をやり直して URL を入れてください。");
-    say("窓口に問い合わせています…"); $("#mPing").disabled = true;
-    try { await gas("importSummary", { pageId: "", json: "", source: "video" }, { waits: [400, 1500] }); say("つながりました。"); }   // 何も保存しない確認用の呼び出し
+    const shown = secret.gas.length > 70 ? secret.gas.slice(0, 56) + "…" + secret.gas.slice(-8) : secret.gas;
+    const head = `登録中の窓口：${shown}\n`;
+    say(head + "問い合わせています…"); $("#mPing").disabled = true;
+    try { await gas("importSummary", { pageId: "", json: "", source: "video" }, { waits: [400, 1500] }); say(head + "つながりました。"); }   // 何も保存しない確認用の呼び出し
     catch (e) {
       const m = e.message;
-      if (/JSON/.test(m)) say("つながりました。共有トークンも、要約の窓口（Summarize.gs）も正常です。");
-      else if (/Summarize\.gs/.test(m)) say("窓口にはつながりましたが、Summarize.gs が入っていないか、デプロイが古いままです。\n「デプロイを管理」→ 編集 → 新しいバージョン、で更新してください。（マーカー・メモの保存だけなら動きます）");
-      else if (/共有トークン/.test(m)) say("窓口にはつながりましたが、共有トークンが違います。GAS のスクリプトプロパティ ACCESS_TOKEN と同じ値で、設定をやり直してください。");
+      if (/JSON/.test(m)) say(head + "つながりました。共有トークンも、要約の窓口（Summarize.gs）も正常です。");
+      else if (/Summarize\.gs/.test(m)) say(head + "窓口にはつながりましたが、Summarize.gs が入っていないか、デプロイが古いままです。\n「デプロイを管理」→ 編集 → 新しいバージョン、で更新してください。（マーカー・メモの保存だけなら動きます）");
+      else if (/共有トークン/.test(m)) say(head + "窓口にはつながりましたが、共有トークンが違います。GAS のスクリプトプロパティ ACCESS_TOKEN と同じ値で、設定をやり直してください。");
       else if (/つながりませんでした/.test(m)) {
         // 応答を読めない理由を切り分ける: no-cors なら、サーバーが何かを返しただけで「届いた」と分かる
         let reach = false;
         try { await fetch(secret.gas + (secret.gas.includes("?") ? "&" : "?") + "r=" + Date.now().toString(36), { mode: "no-cors", cache: "no-store" }); reach = true; } catch {}
-        say(reach
-          ? "窓口のサーバーには届いていますが、ブラウザが応答を受け取れません。多くは次のどれかです。\n① GAS の承認がまだ：エディタで関数を1回実行して、権限を承認する（SETUP の「承認」）\n② アーカイブ済み・古いデプロイの URL を登録している：「デプロイを管理」の有効なデプロイの URL にする\n③ Google が一時的に失敗している：少し待ってもう一度"
-          : "窓口のサーバーに届きません。ネットワーク接続と、登録した URL の綴り（https://script.google.com/macros/s/…/exec）を確認してください。");
+        say(head + (reach
+          ? "サーバーには届いていますが、ブラウザが応答を受け取れません。\n「窓口の URL を開く」で開いたページの文言で、原因を見分けられます。\n・「承認が必要です」「Authorization required」→ GAS の承認がまだ（SETUP の「承認」）\n・「ファイルを開くことができません」「Sorry, unable to open the file」→ アーカイブ済み・古いデプロイの URL、または URL の取り違え\n・「スクリプト関数が見つかりません: doGet」→ 届いて承認も済み。一時的な失敗なので、少し待って再試行\n・Google のログイン画面 →「アクセスできるユーザー」が「全員」でない"
+          : "サーバーに届きません。ネットワーク接続と、登録した URL の綴り（https://script.google.com/macros/s/…/exec）を確認してください。"));
       }
       else say(m);
     }
