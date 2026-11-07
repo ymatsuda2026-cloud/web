@@ -309,3 +309,49 @@ function csIdeasToText_(list) {
     return { heading: String((a && a.title) || '').trim(), body: String((a && a.summary) || '').trim(), points: [] };
   }));
 }
+
+// ================= 診断(動作には使わない) =================
+
+/**
+ * エディタで関数 csSelfTest を選んで「実行」→「実行ログ」で結果を読む。
+ * 何も保存しない。「デプロイした版にこのコードが入っているか」ではなく、
+ * 「今エディタにあるコードとプロパティが揃っているか」を調べる。
+ */
+function csSelfTest() {
+  var p = PropertiesService.getScriptProperties();
+  var lines = [];
+  ['ACCESS_TOKEN', 'NOTION_TOKEN', 'VIDEO_DB_ID', 'GEMINI_API_KEY'].forEach(function (k) {
+    lines.push('プロパティ ' + k + ': ' + (p.getProperty(k) ? 'OK' : '★未設定'));
+  });
+  lines.push('プロパティ WEB_NOTION_TOKEN / WEB_DB_ID: ' + (p.getProperty('WEB_NOTION_TOKEN') ? 'あり' : 'なし(web記事を使わなければ不要)') + ' / ' + (p.getProperty('WEB_DB_ID') ? 'あり' : 'なし'));
+  [['doPost', typeof doPost], ['saveField_', typeof saveField_], ['saveMemo_', typeof saveMemo_], ['fetchDetail_', typeof fetchDetail_],
+   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_]]
+    .forEach(function (x) { lines.push('関数 ' + x[0] + ': ' + (x[1] === 'function' ? 'OK' : '★見つかりません(貼り付けが足りない)')); });
+  if (typeof doPost === 'function') {
+    var body = { action: 'importSummary', token: p.getProperty('ACCESS_TOKEN'), pageId: '', json: '', source: 'video' };
+    var res = doPost({ postData: { contents: JSON.stringify(body) } }).getContent();
+    lines.push('doPost に空の取り込みを送った結果: ' + res);
+    lines.push('  → 「応答からJSONを取り出せませんでした」なら正常。「unknown action」なら doPost に case を足していない。「unauthorized」なら ACCESS_TOKEN が未設定。');
+  }
+  Logger.log(lines.join('\n'));
+}
+
+/**
+ * ブラウザで /exec の URL を開いたときに、デプロイされている版の中身が分かるようにする。
+ * ここに「★」が出る項目があれば、その版には必要な部品が入っていない(=新しいバージョンでデプロイし直す)。
+ * 値そのものは出さない(入っているかどうかだけ)。
+ */
+function doGet() {
+  var p = PropertiesService.getScriptProperties();
+  var info = {
+    ok: true, service: 'clipstock', deployedAt: new Date().toISOString(),
+    doPost: typeof doPost === 'function',
+    summarize: typeof csSummarize_ === 'function',
+    importSummary: typeof csImportSummary_ === 'function',
+    saveField: typeof saveField_ === 'function',
+    hasAccessToken: !!p.getProperty('ACCESS_TOKEN'),
+    hasNotionToken: !!p.getProperty('NOTION_TOKEN'),
+    hasGeminiKey: !!p.getProperty('GEMINI_API_KEY'),
+  };
+  return ContentService.createTextOutput(JSON.stringify(info, null, 2)).setMimeType(ContentService.MimeType.JSON);
+}
