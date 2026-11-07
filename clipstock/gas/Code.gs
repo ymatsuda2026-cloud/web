@@ -129,6 +129,13 @@ function doPost(e) {
       case 'statusCounts':
         result = statusCounts_(body.refresh);
         break;
+      // ---- ClipStock 追加(Summarize.gs) ----
+      case 'summarize':
+        result = csSummarize_(body.pageId, body.source);
+        break;
+      case 'importSummary':
+        result = csImportSummary_(body.pageId, body.json, body.source);
+        break;
       default:
         throw new Error('unknown action: ' + body.action);
     }
