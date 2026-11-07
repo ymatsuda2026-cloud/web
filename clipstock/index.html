@@ -366,6 +366,7 @@ details.mm[open]>summary::before{content:"▾ "}
     <button class="tb" id="mAll">要約待ちを全選択</button>
     <button class="tb main" id="mGo" disabled>選択を要約する</button>
     <button class="tb" id="mClaude">Claude.ai で要約</button>
+    <button class="tb" id="mPing">窓口の接続を確かめる</button>
   </div>
   <p class="mnote" id="mnote"></p>
   <div class="mlist" id="mlist"></div>
@@ -531,7 +532,7 @@ details.mm[open]>summary::before{content:"▾ "}
     try {
       r = await fetch(secret.gas, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
         body: JSON.stringify({ action, token: secret.gastoken, ...payload }) });
-    } catch { throw new Error("要約の窓口につながりませんでした。"); }
+    } catch { throw new Error("要約の窓口（GAS）につながりませんでした。\n・デプロイの「アクセスできるユーザー」が「全員」か\n・登録した URL が、最新のデプロイの /exec か\n（変換管理の「窓口の接続を確かめる」で調べられます）"); }
     const j = await r.json().catch(() => null);
     if (!j) throw new Error("窓口の応答を読めませんでした。");
     if (!j.ok) {
@@ -1448,6 +1449,20 @@ details.mm[open]>summary::before{content:"▾ "}
     ids.forEach(id => all ? S.sel.delete(id) : S.sel.add(id)); drawManage();
   });
   $("#mClaude").addEventListener("click", () => claudeDialog());
+  $("#mPing").addEventListener("click", async () => {
+    const say = t => { $("#mnote").textContent = t; };
+    if (!secret.gas) return say("要約の窓口（GAS）が登録されていません。「🔒 鍵」→ 設定をやり直して URL を入れてください。");
+    say("窓口に問い合わせています…"); $("#mPing").disabled = true;
+    try { await gas("importSummary", { pageId: "", json: "", source: "video" }); say("つながりました。"); }   // 何も保存しない確認用の呼び出し
+    catch (e) {
+      const m = e.message;
+      if (/JSON/.test(m)) say("つながりました。共有トークンも、要約の窓口（Summarize.gs）も正常です。");
+      else if (/Summarize\.gs/.test(m)) say("窓口にはつながりましたが、Summarize.gs が入っていないか、デプロイが古いままです。\n「デプロイを管理」→ 編集 → 新しいバージョン、で更新してください。（マーカー・メモの保存だけなら動きます）");
+      else if (/共有トークン/.test(m)) say("窓口にはつながりましたが、共有トークンが違います。GAS のスクリプトプロパティ ACCESS_TOKEN と同じ値で、設定をやり直してください。");
+      else say(m);
+    }
+    $("#mPing").disabled = false;
+  });
   // ノート
   $("#notes").addEventListener("click", e => {
     if (e.target.closest("#nWrite")) return noteDialog();
