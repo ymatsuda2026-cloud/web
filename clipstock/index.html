@@ -298,6 +298,32 @@ body.full .bar, body.full #shelf, body.full .status{display:none !important}
 body.full .grid{grid-template-columns:minmax(0,1fr)}
 body.full #viewer{display:flex !important}
 
+
+/* 選択モード(まとめてタグ付け)・タグ・重複 */
+.thumb .chk{position:absolute; left:6px; top:5px; width:22px; height:22px; border-radius:50%; background:rgba(255,255,255,.85); color:transparent; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; font-size:13px; font-weight:700}
+.selmode .thumb .chk{display:flex}
+.selmode .web{left:34px}
+.item.sel .thumb .chk{background:var(--cloth); color:#fff; border-color:#fff}
+.item.sel .thumb{outline:3px solid var(--foil); outline-offset:2px}
+.selmode .more{visibility:hidden}
+#shelf{display:flex; flex-direction:column}
+#shelf > .list{flex:1 0 auto}
+#shelf > #detail{flex:1 0 auto}
+#bulkbar{margin-top:auto; position:sticky; bottom:0; z-index:3; display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 12px; background:var(--cloth); color:var(--cloth-ink); box-shadow:0 -6px 18px rgba(20,24,40,.2)}
+#bulkbar[hidden]{display:none}
+#bulkbar .bn{font-size:13px; margin-right:auto}
+#bulkbar .tb{background:transparent; color:var(--cloth-ink); border-color:rgba(255,255,255,.4)}
+#bulkbar .tb.main{background:var(--cloth-ink); color:var(--cloth)}
+#bulkbar .tb[disabled]{opacity:.4}
+.tagedit .chips{margin-bottom:8px}
+.tagadd{display:flex; gap:6px; align-items:center}
+.tagadd input{flex:1; min-width:0; border:1px solid var(--line); background:var(--sheet); border-radius:6px; min-height:32px; padding:0 10px; font-size:13px}
+.chip.sel{border-color:var(--foil); background:var(--foil-soft); color:var(--ink)}
+.badge.dup{color:var(--danger); border-color:var(--danger)}
+.tb.danger{color:var(--danger); border-color:var(--danger)}
+.row .dupnote{color:var(--danger)}
+
+body:has(#bulkbar:not([hidden])) .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
 @media (max-width:820px){
   .grid{grid-template-columns:minmax(0,1fr)}
   #viewer{display:none}
@@ -363,6 +389,7 @@ body.full #viewer{display:flex !important}
 <header class="bar" id="bar" hidden>
   <div class="brand">ClipStock</div>
   <select class="kind" id="kind" aria-label="種別"></select>
+  <select class="kind" id="tagSel" aria-label="タグ"></select>
   <input class="search" id="q" type="search" placeholder="タイトル・要約から探す" aria-label="タイトル・要約から探す" enterkeyhint="search">
   <nav class="navs">
   <button class="hb" data-m="library" aria-pressed="true">一覧</button>
@@ -390,10 +417,12 @@ body.full #viewer{display:flex !important}
         <button data-s="new" class="on">新しい順</button>
         <button data-s="old">古い順</button>
       </div>
+      <button class="tb" id="selBtn" aria-pressed="false" title="いくつか選んで、まとめてタグを付ける">選択</button>
       <button class="tb" id="wideBtn" aria-pressed="false" title="一覧を画面いっぱいに広げる">広げる</button>
     </div>
     <div class="list" id="list"></div>
     <div id="detail" hidden></div>
+    <div id="bulkbar" hidden></div>
   </nav>
 
   <article id="viewer" class="h">
@@ -407,6 +436,7 @@ body.full #viewer{display:flex !important}
       <button class="tb" id="fsUp" aria-label="文字を大きく">A＋</button>
       <button class="tb" id="tocBtn" aria-haspopup="dialog">目次</button>
       <button class="tb" id="recBtn" aria-haspopup="dialog" title="この動画のマーカーとメモ">記録<span class="rc" id="recN"></span></button>
+      <button class="tb" id="tagBtn" aria-haspopup="dialog" title="この動画のタグ">タグ</button>
       <button class="tb" id="openSrc">▶ 動画を開く</button>
       <span class="sp"></span>
       <button class="tb" id="optBtn" aria-label="表示の設定" aria-haspopup="dialog">⚙ 表示</button>
@@ -429,20 +459,20 @@ body.full #viewer{display:flex !important}
       <button data-f="todo">未変換<span class="n"></span></button>
       <button data-f="queue">要約待ち<span class="n"></span></button>
       <button data-f="done">要約済み<span class="n"></span></button>
+      <button data-f="dup">重複<span class="n"></span></button>
     </div>
     <input type="search" id="mq" placeholder="タイトルで探す" aria-label="タイトルで探す">
     <span class="sp"></span>
     <button class="tb" id="mAll">要約待ちを全選択</button>
     <button class="tb main" id="mGo" disabled>選択を要約する</button>
     <button class="tb" id="mClaudeAll">Claude.ai で要約待ちを変換</button>
-    <button class="tb" id="mClaude">1本ずつ貼って要約</button>
-    <button class="tb" id="mPing">窓口の接続を確かめる</button>
-    <button class="tb" id="mOpenGas">窓口の URL を開く</button>
+    <button class="tb" id="mDel" disabled title="重複したものを、Notion のゴミ箱へ移す">重複を削除</button>
   </div>
   <p class="mnote" id="mnote"></p>
   <div class="mlist" id="mlist"></div>
 </section>
 
+<datalist id="taglist"></datalist>
 <div class="pop" id="pop" hidden role="dialog" aria-modal="true"><div class="pop-card" id="popCard"></div></div>
 
 <div class="vp" id="vp" hidden role="dialog" aria-label="動画プレーヤー">
@@ -525,6 +555,7 @@ body.full #viewer{display:flex !important}
     mode: "library", mfilter: "all", mq: "", sel: new Set(), run: {}, ovl: {}, bundles: new Map(), busy: false,
     vp: { w: 480, x: null, y: null }, vpId: "", prevSeen: 0
   };
+  S.dup = new Map(); S.tag = "all"; S.selMode = false; S.tsel = new Set();
   { const p = ls.get(PREFS, {}); for (const k of ["tile", "vert", "fs", "sort", "vp"]) if (p[k] !== undefined) S[k] = p[k]; }
   const savePrefs = () => ls.set(PREFS, { tile: S.tile, vert: S.vert, fs: S.fs, sort: S.sort, vp: S.vp });
   let toastTimer = 0;
@@ -684,26 +715,29 @@ body.full #viewer{display:flex !important}
     const fresh = obj.at !== S.at || !S.items.length;
     S.at = obj.at;
     if (fresh) {
-      S.items = obj.items || [];
+      const ids = new Set((obj.items || []).map(x => x.id));
+      for (const [id, o] of Object.entries(RS.gone)) if (!ids.has(id) && Date.parse(obj.at) > (o.at || 0)) delete RS.gone[id];   // 書き出しに反映されたら、削除の印は外す
+      S.items = (obj.items || []).filter(x => !RS.gone[x.id]);
       S.byId = new Map(S.items.map(x => [x.id, x]));
-      mergeOverlay();
+      mergeOverlay(); computeDups(); catchUpTags();
       drawKind(); drawAll();
     }
     setStatus(`${how === "cache" ? "この端末の保存から表示・裏で更新を確認中…" : "最新"} ・ 要約済み ${doneCount()} 件 ・ 取得 ${mdhm(obj.at)}`);
   }
-  const doneCount = () => S.items.filter(x => x.st === "要約済み").length;
+  const doneCount = () => S.items.filter(x => x.st === "要約済み" && !isDup(x)).length;
 
   function drawKind() {
-    const done = S.items.filter(x => x.st === "要約済み");
+    const done = S.items.filter(x => x.st === "要約済み" && !isDup(x));
     const n = k => done.filter(x => x.src === k).length;
     const opts = [["all", `種別：すべて（${done.length}）`], ["video", `動画（${n("video")}）`], ["web", `Web記事（${n("web")}）`]];
     const sel = $("#kind");
     sel.innerHTML = opts.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
     sel.value = S.kind;
+    drawTagMenu();
   }
   function visible() {
     const q = S.q.trim().toLowerCase();
-    const a = S.items.filter(x => x.st === "要約済み" && (S.kind === "all" || x.src === S.kind)
+    const a = S.items.filter(x => x.st === "要約済み" && !isDup(x) && (S.kind === "all" || x.src === S.kind) && tagOk(x)
       && (!q || (x.t || "").toLowerCase().includes(q) || (x.s || "").toLowerCase().includes(q)));
     a.sort((p, r) => S.sort === "old" ? (p.c || "").localeCompare(r.c || "") : (r.c || "").localeCompare(p.c || ""));
     return a;
@@ -711,8 +745,9 @@ body.full #viewer{display:flex !important}
   const TILE = { s: 92, m: 124, l: 172 };
   /* 新着(書庫と同じ考え方): 前回開いたあとに要約されて、まだ開いていないもの */
   const isNew = x => !!S.prevSeen && !RS.pos[x.id] && Date.parse(x.g || x.e || "") > S.prevSeen;
-  function thumbBox(x) {
-    return `<span class="thumb" style="--h:${hashHue(x.t)}" ${x.th ? `data-th="${x.id}"` : ""}><span class="ph" aria-hidden="true"><b>${esc(x.t)}</b></span>${x.src === "web" ? '<span class="web">Web</span>' : ""}${isNew(x) ? '<span class="nb">新着</span>' : ""}${x.d ? `<span class="len">${dur(x.d)}</span>` : ""}</span>`;
+  function thumbBox(x, withChk) {
+    // サムネイルがあるものは、背景に文字を入れない(読み込めなかったときだけ、題名を出す)
+    return `<span class="thumb" style="--h:${hashHue(x.t)}" data-tt="${esc(x.t)}" ${x.th ? `data-th="${x.id}"` : ""}>${x.th ? "" : `<span class="ph" aria-hidden="true"><b>${esc(x.t)}</b></span>`}${x.src === "web" ? '<span class="web">Web</span>' : ""}${isNew(x) ? '<span class="nb">新着</span>' : ""}${x.d ? `<span class="len">${dur(x.d)}</span>` : ""}${withChk ? '<span class="chk">✓</span>' : ""}</span>`;
   }
   function drawList() {
     const rows = visible();
@@ -720,11 +755,12 @@ body.full #viewer{display:flex !important}
     const list = $("#list");
     list.style.setProperty("--tile", Math.round(TILE[S.tile] * (S.wide ? 1.25 : 1)) + "px");
     list.style.setProperty("--tt", ({ s: 11.5, m: 12.5, l: 13.5 }[S.tile] + (S.wide ? 0.5 : 0)) + "px");
-    list.innerHTML = rows.map(x => `<div class="cell"><button class="item${x.id === S.cur ? " on" : ""}" data-id="${x.id}">${thumbBox(x)}<span class="it-title" title="${esc(x.t)}">${esc(x.t)}</span><span class="it-meta">${srcLabel(x.src)} ・ ${md(x.c)}${RS.fin[x.id]?.v ? " ・ 読了" : ""}</span></button><button class="more" data-gb="${x.id}">目次・記録 ›</button></div>`).join("")
+    list.classList.toggle("selmode", S.selMode);
+    list.innerHTML = rows.map(x => `<div class="cell"><button class="item${x.id === S.cur ? " on" : ""}${S.tsel.has(x.id) ? " sel" : ""}" data-id="${x.id}">${thumbBox(x, true)}<span class="it-title" title="${esc(x.t)}">${esc(x.t)}</span><span class="it-meta">${srcLabel(x.src)} ・ ${md(x.c)}${RS.fin[x.id]?.v ? " ・ 読了" : ""}</span></button><button class="more" data-gb="${x.id}">目次・記録 ›</button></div>`).join("")
       || `<p class="empty" style="grid-column:1/-1">${S.items.length ? "条件に合う動画がありません。<br>要約していないものは「変換管理」から要約してください。" : "まだ書き出されたデータがありません。"}</p>`;
     hydrateThumbs(list);
   }
-  function drawAll() { drawList(); if (S.mode === "manage") drawManage(); }
+  function drawAll() { computeDups(); drawList(); if (S.mode === "manage") drawManage(); }
 
   /* サムネ: 見えたものだけ取りに行く(同時6本・Blob URL をメモリに保持) */
   const thumbs = new Map();
@@ -746,7 +782,11 @@ body.full #viewer{display:flex !important}
       if (!e.isIntersecting) return;
       io.unobserve(e.target);
       const el = e.target, id = el.dataset.th;
-      loadThumb(id).then(u => { if (u && el.isConnected) { const im = new Image(); im.alt = ""; im.decoding = "async"; im.src = u; el.prepend(im); } });
+      loadThumb(id).then(u => {
+        if (!el.isConnected) return;
+        if (u) { const im = new Image(); im.alt = ""; im.decoding = "async"; im.src = u; el.prepend(im); }
+        else el.insertAdjacentHTML("afterbegin", `<span class="ph" aria-hidden="true"><b>${esc(el.dataset.tt || "")}</b></span>`);
+      });
     }), { rootMargin: "300px" });
     root.querySelectorAll("[data-th]").forEach(el => io.observe(el));
   }
@@ -1010,26 +1050,58 @@ body.full #viewer{display:flex !important}
 
   /* ---------- 変換管理 ---------- */
   function drawManage() {
-    const LBL = { todo: ["未変換", "todo"], queue: ["要約待ち", "queue"], done: ["要約済み", "done"] };
+    const LBL = { todo: ["未変換", "todo"], queue: ["要約待ち", "queue"], done: ["要約済み", "done"], dup: ["重複", "dup"] };
     const q = S.mq.trim().toLowerCase();
     const all = S.items.slice().sort((a, b) => (b.c || "").localeCompare(a.c || ""));
-    const n = g => all.filter(x => group(x.st) === g).length;
+    const n = g => all.filter(x => grp(x) === g).length;
     $$("#mfilter button").forEach(b => { b.classList.toggle("on", b.dataset.f === S.mfilter); b.querySelector(".n").textContent = b.dataset.f === "all" ? all.length : n(b.dataset.f); });
-    const rows = all.filter(x => (S.mfilter === "all" || group(x.st) === S.mfilter) && (!q || (x.t || "").toLowerCase().includes(q)));
+    const rows = all.filter(x => (S.mfilter === "all" || grp(x) === S.mfilter) && (!q || (x.t || "").toLowerCase().includes(q)));
     $("#mlist").innerHTML = rows.map(x => {
-      const g = group(x.st), run = S.run[x.id], [lab, cls] = run === "run" ? ["要約中…", "queue"] : run === "err" ? ["失敗", "todo"] : (g === "todo" && x.st === "処理中") ? ["文字起こし中", "queue"] : LBL[g];
-      const cl = `<button class="tb" data-act="claude" data-id="${x.id}" ${S.busy ? "disabled" : ""}>Claude.ai</button>`;
-      const act = `<span class="racts">` + (g === "done" ? `<button class="tb" data-act="open" data-id="${x.id}">開く</button>${cl}`
-        : g === "queue" ? `<button class="tb" data-act="sum" data-id="${x.id}" ${run === "run" || S.busy ? "disabled" : ""}>要約する</button>${cl}`
+      const g = grp(x), run = S.run[x.id];
+      if (g === "dup") {                                   // 重複: 一覧には出さない。できるのは削除だけ
+        const pr = S.byId.get(S.dup.get(x.id));
+        return `<div class="row"><input type="checkbox" data-id="${x.id}" ${S.sel.has(x.id) ? "checked" : ""} aria-label="選ぶ">${thumbBox(x)}<span><span class="t">${esc(x.t)}</span><br><span class="m">${srcLabel(x.src)} ・ ${md(x.c)} ・ ${esc(x.st)}<br><span class="dupnote">重複：「${esc(pr?.t || "")}」と同じ${x.src === "web" ? "記事" : "動画"}</span></span></span><span class="badge dup">重複</span><span class="racts"><button class="tb danger" data-act="del" data-id="${x.id}" ${S.busy ? "disabled" : ""}>削除</button></span></div>`;
+      }
+      const [lab, cls] = run === "run" ? ["要約中…", "queue"] : run === "err" ? ["失敗", "todo"] : (g === "todo" && x.st === "処理中") ? ["文字起こし中", "queue"] : LBL[g];
+      const act = `<span class="racts">` + (g === "done" ? `<button class="tb" data-act="open" data-id="${x.id}">開く</button>`
+        : g === "queue" ? `<button class="tb" data-act="sum" data-id="${x.id}" ${run === "run" || S.busy ? "disabled" : ""}>要約する</button>`
         : `<button class="tb" disabled>待機中</button>`) + `</span>`;
       return `<div class="row"><input type="checkbox" data-id="${x.id}" ${g === "todo" ? "disabled" : ""} ${S.sel.has(x.id) ? "checked" : ""} aria-label="選ぶ">${thumbBox(x)}<span><span class="t">${esc(x.t)}</span><br><span class="m">${srcLabel(x.src)} ・ ${md(x.c)} ・ ${esc(x.st)}</span></span><span class="badge ${cls}">${lab}</span>${act}</div>`;
     }).join("") || `<p class="empty">この条件のものはありません。</p>`;
     hydrateThumbs($("#mlist"));
-    $("#mGo").disabled = S.busy || ![...S.sel].some(id => group(S.byId.get(id)?.st) !== "todo");
-    $("#mGo").textContent = S.sel.size ? `選択を要約する（${S.sel.size}）` : "選択を要約する";
+    const sumIds = [...S.sel].filter(id => { const x = S.byId.get(id); return x && ["queue", "done"].includes(grp(x)); });
+    const dupIds = [...S.sel].filter(id => { const x = S.byId.get(id); return x && isDup(x); });
+    $("#mGo").disabled = S.busy || !sumIds.length;
+    $("#mGo").textContent = sumIds.length ? `選択を要約する（${sumIds.length}）` : "選択を要約する";
+    $("#mDel").disabled = S.busy || !dupIds.length;
+    $("#mDel").textContent = dupIds.length ? `重複を削除（${dupIds.length}）` : "重複を削除";
+  }
+  /** 重複の削除(Notion のゴミ箱へ。30日間は Notion から戻せる)。元の1件(要約を残す方)は消さない */
+  function deleteDups(ids) {
+    const targets = ids.map(id => S.byId.get(id)).filter(x => x && isDup(x));
+    if (!targets.length || S.busy) return;
+    if (!secret.gas) { $("#mnote").textContent = "要約の窓口（GAS）が未登録のため、削除できません。"; return; }
+    popOpen("重複を削除", `<p><b>${targets.length} 件</b>の重複を削除します。</p>
+      <ul style="margin:6px 0 10px 1.2em;padding:0">${targets.slice(0, 8).map(x => `<li>${esc(x.t)}</li>`).join("")}${targets.length > 8 ? `<li>ほか ${targets.length - 8} 件</li>` : ""}</ul>
+      <p class="recline">Notion の「ゴミ箱」に移ります（30日間は、Notion から元に戻せます）。同じ動画の、もう1件（残す方）は削除しません。</p>
+      <div class="acts"><button class="tb danger" id="delGo">削除する</button><button class="tb" id="delNo">やめる</button></div>`, () => {
+      $("#delNo").onclick = popClose;
+      $("#delGo").onclick = async () => {
+        popClose(); S.busy = true; let ok = 0; const bad = [];
+        for (let i = 0; i < targets.length; i++) {
+          const x = targets[i]; $("#mnote").textContent = `削除中 ${i + 1}/${targets.length}：${x.t}`; drawManage();
+          try {
+            await gas("deleteVideo", { pageId: x.id, source: x.src }, { waits: [400, 1500] });
+            RS.gone[x.id] = { at: Date.now() }; S.items = S.items.filter(v => v.id !== x.id); S.byId.delete(x.id); S.sel.delete(x.id); ok++;
+          } catch (e) { bad.push(`${x.t}：${e.message}`); }
+        }
+        S.busy = false; if (ok) saveRS(true); computeDups(); drawAll(); drawKind();
+        $("#mnote").textContent = `${ok} 件を削除しました。` + (bad.length ? "\n" + bad.join("\n") : "");
+      };
+    });
   }
   async function runSummaries(ids) {
-    const targets = ids.map(id => S.byId.get(id)).filter(x => x && group(x.st) !== "todo");
+    const targets = ids.map(id => S.byId.get(id)).filter(x => x && !isDup(x) && group(x.st) !== "todo");
     if (!targets.length || S.busy) return;
     if (!secret.gas) { $("#mnote").textContent = "要約の窓口（GAS）が未登録です。"; return; }
     S.busy = true; let ok = 0; const bad = [];
@@ -1046,79 +1118,6 @@ body.full #viewer{display:flex !important}
     S.busy = false; drawManage(); drawKind();
     $("#mnote").textContent = `${ok} 件を要約しました。一覧に並んでいます（次の書き出しで web-archive にも反映されます）。` + (bad.length ? "\n" + bad.join("\n") : "");
   }
-  function claudePrompt(title, transcript) {
-    const text = String(transcript || "").slice(0, 100000), timed = TC1.test(text);
-    const L = [
-      "次の動画(または記事)の文字起こしを読み、下の形式のJSONだけを返してください。",
-      "前後の説明文やコードフェンス(```)は付けず、日本語で書いてください。", "",
-      "{",
-      '  "summary": "5〜8文のサマリ。何の話か・結論・押さえる点。箇条書きにしない",',
-      '  "mindmap": { "title": "主題", "branches": [ { "label": "大項目", "quote": "", "children": [ { "label": "小項目", "quote": "", "children": [] } ] } ] },',
-      '  "fields": [ { "name": "分野名", "summary": "1〜2文", "points": [ ' + (timed ? '{ "text": "具体的な事実・数値・手順を1行で", "quote": "根拠の原文を一字一句そのまま" }' : '"具体的な事実・数値・手順を1行で"') + " ] } ],",
-      '  "apply": [ { "title": "応用案の題", "summary": "どう使うか1〜2文", "steps": ["最初の一歩", "次の一歩"] } ],',
-      '  "ideas": [ { "title": "活用アイデアの題", "summary": "面白い・意外な使い方1〜2文" } ]',
-      "}", "", "決まり:",
-      "- mindmap は大項目4〜7、各2〜5の子、深さは最大3。",
-      "- 分野は2〜5。points は各2〜5件。apply は2〜4件、ideas は3〜5件。",
-      "- 文字起こしに書かれていないことを足さない."
-    ];
-    if (timed) {
-      L.push("- quote は文字起こしに実在する文字列を20〜60字で一字一句そのまま写す。言い換えない。該当が無い項目は空文字。");
-      L.push("- 時刻や秒数は書かない(こちらで原文から割り出す)。");
-    }
-    return `動画タイトル: ${title}\n\n----------------\n\n${L.join("\n")}\n\n----------------\n\n${text}`;
-  }
-  function claudeDialog(preId) {
-    // 要約待ちを先に、続けて要約済み(作り直し用)
-    const cands = S.items.filter(x => group(x.st) !== "todo")
-      .sort((a, b) => (group(a.st) === "queue" ? 0 : 1) - (group(b.st) === "queue" ? 0 : 1) || (b.c || "").localeCompare(a.c || ""));
-    if (!cands.length) {
-      popOpen("Claude.ai で要約", `<p>要約できる動画がありません。<br>文字起こしが終わって「要約待ち」になったものが、ここに並びます。</p>`);
-      return;
-    }
-    const ok = id => id && cands.some(c => c.id === id);
-    const pick = ok(preId) ? preId : ([...S.sel].find(ok) || (ok(S.cur) ? S.cur : cands[0].id));
-    const opt = c => `<option value="${c.id}" ${c.id === pick ? "selected" : ""}>${group(c.st) === "queue" ? "【要約待ち】" : "【要約済み】"}${esc(c.t)}</option>`;
-    popOpen("Claude.ai で要約", `
-      <h4>① 要約する動画を選ぶ</h4>
-      <select id="cpSel">${cands.map(opt).join("")}</select>
-      <h4>② プロンプト（文字起こし込み）を作って Claude.ai に貼る</h4>
-      <div class="acts"><button class="tb main" id="cpMake">プロンプトを作ってコピー</button><a class="tb" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">Claude.ai を開く</a></div>
-      <textarea id="cpTa" readonly placeholder="ここにプロンプトが表示されます"></textarea>
-      <h4>③ Claude の返答（JSON）を貼って取り込む</h4>
-      <textarea id="jsTa" placeholder='{ "summary": "…", "mindmap": {…}, … }'></textarea>
-      <div class="acts"><button class="tb main" id="jsGo">取り込んで保存</button></div>
-      <div class="msg" id="cpMsg"></div>`, () => {
-      const say = (t, color = "var(--danger)") => { $("#cpMsg").style.color = color; $("#cpMsg").textContent = t; };
-      $("#cpSel").onchange = () => { $("#cpTa").value = ""; say(""); };
-      $("#cpMake").onclick = async () => {
-        const id = $("#cpSel").value, it = S.byId.get(id);
-        $("#cpMake").disabled = true; say("");
-        try {
-          const b = await getBundle(id);
-          if (!String(b.transcript || "").trim()) throw new Error("文字起こしがまだ web-archive にありません。Mac で clipstock_export.py を実行してから、更新（↻）してください。");
-          const text = claudePrompt(it.t, b.transcript);
-          $("#cpTa").value = text;
-          try { await navigator.clipboard.writeText(text); say("コピーしました。Claude.ai に貼り付けてください。", "var(--ok)"); }
-          catch { $("#cpTa").focus(); $("#cpTa").select(); say("自動でコピーできませんでした。選択された状態なので、コピー（⌘C / Ctrl+C）してください。", "var(--muted)"); }
-        } catch (e) { say(e.message); }
-        $("#cpMake").disabled = false;
-      };
-      $("#jsGo").onclick = async () => {
-        const id = $("#cpSel").value, it = S.byId.get(id), v = $("#jsTa").value.trim();
-        if (!v) { say("Claude の返答を貼ってください。"); return; }
-        $("#jsGo").disabled = true; say("保存しています…", "var(--muted)");
-        try {
-          const r = await gas("importSummary", { pageId: id, json: v, source: it.src });
-          applySummary(id, r); S.bundles.delete(id); S.sel.delete(id); popClose(); drawAll(); drawKind();
-          $("#mnote").textContent = `取り込みました：${it.t}`;
-          if (S.cur === id) rerender(id);
-        } catch (e) { say(e.message); $("#jsGo").disabled = false; }
-      };
-    });
-  }
-
-  /* ---------- ノート ---------- */
   /* ---------- ノート画面(書庫と同じ: 色・メモで絞って見る) ---------- */
   let nKind = "all", nq = "";
   const SECN = { summary: "サマリ", fields: "分野別", apply: "応用", ideas: "活用", mindmap: "マップ" };
@@ -1131,7 +1130,7 @@ body.full #viewer{display:flex !important}
     const q = nq.trim().toLowerCase();
     const pass = n => (nKind === "all" || (nKind === "memo" ? !!n.text : nKind === "legacy" ? !!n.legacy : (!n.legacy && n.color === nKind)))
       && (!q || (n.quote + " " + (n.text || "")).toLowerCase().includes(q));
-    const list = [...allNotes(), ...legacyNotes()].filter(pass).filter(n => S.byId.has(n.iid));
+    const list = [...allNotes(), ...legacyNotes()].filter(pass).filter(n => S.byId.has(n.iid) && !isDup(S.byId.get(n.iid)));
     const byItem = new Map();
     list.forEach(n => (byItem.get(n.iid) || byItem.set(n.iid, []).get(n.iid)).push(n));
     const ids = [...byItem.keys()].sort((a, b) => (S.byId.get(b).c || "").localeCompare(S.byId.get(a).c || ""));
@@ -1175,7 +1174,7 @@ body.full #viewer{display:flex !important}
     const bars = []; for (let i = 13; i >= 0; i--) { const t = Date.now() - i * 864e5; bars.push([new Date(t).getDate(), db.days[dayKey(t)]?.sec || 0]); }
     const max = Math.max(60, ...bars.map(b => b[1]));
     const top = Object.entries(db.items).filter(([id]) => S.byId.has(id)).sort((a, b) => b[1].sec - a[1].sec).slice(0, 5);
-    const g = k => S.items.filter(x => group(x.st) === k).length;
+    const g = k => S.items.filter(x => grp(x) === k).length;
     $("#stats").innerHTML = `<h2>記録</h2><p class="lead">この端末で本文を開いていた時間と、要約の進み具合。他の端末とは合算しません。</p>
       <div class="stats">
         <div class="stat"><div class="n">${h(db.days[today]?.sec || 0)}</div><div class="l">今日</div></div>
@@ -1252,6 +1251,7 @@ body.full #viewer{display:flex !important}
           if (!S.cur && last && S.byId.get(last)?.st === "要約済み" && !mobile()) openItem(last);
         }
       });
+      resumeTagSync();                                     // 前回 Notion に届かなかったタグを、あらためて送る
     } catch (e) {
       setStatus("");
       $("#list").innerHTML = `<p class="empty" style="grid-column:1/-1">${esc(e.code === 404 ? "web-archive に index.json.age がまだありません。Mac で clipstock_export.py を実行してください。" : e.message)}</p>`;
@@ -1260,9 +1260,9 @@ body.full #viewer{display:flex !important}
   function lock() {
     vpClose(); hideSelTool(); hidePop(); setFull(false); closeDetail(); stopTrack();
     flushRS(); persistNow();                                  // 鍵を捨てる前に、記録を送り切る・暗号化して保存する
-    secret = null; K = null; dec = null; RS = { pos: {}, fin: {}, notes: {} }; SY.sha = null; SY.dirty = false; S.view = "main";
+    secret = null; K = null; dec = null; RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {} }; SY.sha = null; SY.dirty = false; S.view = "main";
     thumbs.forEach(p => p.then(u => u && URL.revokeObjectURL(u))); thumbs.clear(); waiting.length = 0;
-    S.items = []; S.byId = new Map(); S.at = ""; S.notes = null; S.night = null; S.cur = null; S.bundles.clear(); S.curBundle = null; S.sel.clear(); S.ovl = {};
+    S.items = []; S.byId = new Map(); S.at = ""; S.notes = null; S.night = null; S.cur = null; S.bundles.clear(); S.curBundle = null; S.sel.clear(); S.ovl = {}; S.dup = new Map(); S.tag = "all"; S.selMode = false; S.tsel.clear(); tagPending.clear(); $("#bulkbar").hidden = true; $("#selBtn").setAttribute("aria-pressed", "false"); $("#selBtn").textContent = "選択";
     $("#list").innerHTML = ""; $("#stage").innerHTML = ""; $("#vhead").innerHTML = ""; popClose(); showGate();
   }
 
@@ -1314,14 +1314,14 @@ body.full #viewer{display:flex !important}
 
   /* ---------- 読んだ記録・マーカー・メモ(書庫と同じ作り。暗号化して web-archive に同期) ---------- */
   const RSK = "clipstock.rstate", OPTK = "clipstock.opts", ACCK = "clipstock.acc", STATE_PATH = "clipstock-state.json.age";
-  let RS = { pos: {}, fin: {}, notes: {} };
+  let RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {} };
   const O = Object.assign({ font: "shippori" }, ls.get(OPTK, {}));
-  const ACC = Object.assign({ toc: true, notes: false }, ls.get(ACCK, {}));
+  const ACC = Object.assign({ toc: true, notes: false, tags: true }, ls.get(ACCK, {}));
   const SY = { sha: null, timer: 0, dirty: false, warned: false, busy: false };
   const SYNC_SOON = DEV.syncSoon ?? 3000, SYNC_LATER = DEV.syncLater ?? 90000;
   const urlFor = (sec, path) => `https://api.github.com/repos/${encodeURIComponent(sec.owner)}/${encodeURIComponent(sec.repo)}/contents/${path}`;
   const ghHeaders = sec => ({ Authorization: "Bearer " + sec.token, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" });
-  async function loadRS() { try { const v = ls.get(RSK, null); RS = Object.assign({ pos: {}, fin: {}, notes: {} }, v ? await unsealWith(K, v) : {}); } catch { RS = { pos: {}, fin: {}, notes: {} }; } }
+  async function loadRS() { try { const v = ls.get(RSK, null); RS = Object.assign({ pos: {}, fin: {}, notes: {}, tags: {}, gone: {} }, v ? await unsealWith(K, v) : {}); } catch { RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {} }; } }
   let rsT = 0;
   const persistNow = () => K ? sealWith(K, RS).then(v => ls.set(RSK, v)).catch(() => {}) : Promise.resolve();
   function persistRS() { clearTimeout(rsT); rsT = setTimeout(persistNow, 300); }
@@ -1330,7 +1330,7 @@ body.full #viewer{display:flex !important}
   }
   const newer = (a, b) => { const o = { ...(a || {}) }; for (const [k, v] of Object.entries(b || {})) if (!o[k] || (v?.at || 0) > (o[k]?.at || 0)) o[k] = v; return o; };
   function mergeRS(r) {
-    RS.pos = newer(RS.pos, r.pos); RS.fin = newer(RS.fin, r.fin);
+    RS.pos = newer(RS.pos, r.pos); RS.fin = newer(RS.fin, r.fin); RS.tags = newer(RS.tags, r.tags); RS.gone = newer(RS.gone, r.gone);
     const nn = { ...(RS.notes || {}) };
     for (const [id, m] of Object.entries(r.notes || {})) nn[id] = newer(nn[id], m);
     RS.notes = nn; persistRS();
@@ -1578,6 +1578,7 @@ body.full #viewer{display:flex !important}
   function detailHtml(it) {
     return `<div class="sdetail"><button class="sback" data-gback="1">‹ 一覧へ</button>
       <div class="shead">${thumbBox(it)}<div><span class="it-title">${esc(it.t)}</span><span class="it-meta">${srcLabel(it.src)} ・ ${md(it.c)}${it.d ? " ・ " + dur(it.d) : ""}${RS.fin[it.id]?.v ? '<span class="finb">読了</span>' : ""}</span></div></div>
+      <details class="acc" data-acck="tags"${ACC.tags ? " open" : ""}><summary>タグ<span class="cnt" data-tcnt="1">${effTags(it).length}</span></summary><div class="accbody">${tagEditor(it)}</div></details>
       <details class="acc" data-acck="toc"${ACC.toc ? " open" : ""}><summary>目次<span class="cnt">6</span></summary><div class="accbody">${tocButtons(it)}</div></details>
       <details class="acc" data-acck="notes"${ACC.notes ? " open" : ""}><summary>記録<span class="cnt">${liveNotes(it.id).length}</span></summary><div class="accbody">${recHtml(it.id)}</div></details></div>`;
   }
@@ -1664,6 +1665,139 @@ body.full #viewer{display:flex !important}
     }
   }
 
+  /* ---------- 重複(同じ動画・同じ記事)。変換の管理に回し、一覧には出さない ---------- */
+  const dupKey = x => {
+    const id = ytId(x.url); if (id) return "yt:" + id;
+    const u = String(x.url || "").trim(); if (!u) return "";
+    try { const o = new URL(u); o.hash = ""; [...o.searchParams.keys()].forEach(k => { if (/^(utm_|fbclid|gclid)/i.test(k)) o.searchParams.delete(k); }); return (o.origin + o.pathname.replace(/\/$/, "") + o.search).toLowerCase(); }
+    catch { return u.toLowerCase(); }
+  };
+  const RANK = { "要約済み": 0, "完了": 1, "処理中": 2 };
+  function computeDups() {                         // 同じ URL が複数あるとき、要約が進んでいる方・古い方を残し、あとは重複にする
+    S.dup = new Map(); const g = new Map();
+    for (const x of S.items) { const k = dupKey(x); if (k) (g.get(k) || g.set(k, []).get(k)).push(x); }
+    for (const list of g.values()) if (list.length > 1) {
+      list.sort((a, b) => (RANK[a.st] ?? 3) - (RANK[b.st] ?? 3) || (a.c || "").localeCompare(b.c || ""));
+      for (const x of list.slice(1)) S.dup.set(x.id, list[0].id);
+    }
+  }
+  const isDup = x => !!x && S.dup.has(x.id);
+  const grp = x => isDup(x) ? "dup" : group(x.st);
+
+  /* ---------- タグ(記録と同じ暗号化同期。Notion の「タグ」にも書き込む) ---------- */
+  const effTags = x => { const o = RS.tags[x.id]; return o ? o.v : (x.tg || []); };
+  const sameSet = (a, b) => a.length === b.length && a.every(t => b.includes(t));
+  const cleanTag = t => String(t ?? "").replace(/^#+/, "").replace(/[,，]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);   // Notion のタグ名には、半角のカンマを使えない
+  const tagOk = x => S.tag === "all" || (S.tag === "none" ? !effTags(x).length : effTags(x).includes(S.tag.slice(2)));
+  function tagVocab(onlyDone) {
+    const m = new Map();
+    for (const x of S.items) { if (isDup(x) || (onlyDone && x.st !== "要約済み")) continue; for (const t of effTags(x)) m.set(t, (m.get(t) || 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"));
+  }
+  function drawTagMenu() {
+    const voc = tagVocab(true), none = S.items.filter(x => x.st === "要約済み" && !isDup(x) && !effTags(x).length).length;
+    if (S.tag.startsWith("t:") && !voc.some(([t]) => t === S.tag.slice(2))) S.tag = "all";
+    const sel = $("#tagSel");
+    sel.innerHTML = [["all", "タグ：すべて"], ["none", `タグなし（${none}）`], ...voc.map(([t, n]) => ["t:" + t, `${t}（${n}）`])].map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+    sel.value = S.tag;
+    $("#taglist").innerHTML = tagVocab(false).map(([t]) => `<option value="${esc(t)}"></option>`).join("");
+  }
+  const tagPending = new Set(); let tagBusy = false;
+  function queueTagSync(iid) { if (!secret?.gas) return; tagPending.add(iid); if (!tagBusy) tagWorker(); }
+  async function tagWorker() {                     // Notion への書き込みは、1件ずつ順に(GAS は立て続けに送ると失敗しやすい)
+    tagBusy = true; let ok = 0, failed = false;
+    while (tagPending.size) {
+      const iid = [...tagPending][0]; tagPending.delete(iid);
+      const o = RS.tags[iid], it = S.byId.get(iid); if (!o || !it || !secret?.gas) continue;
+      try { await gas("saveTags", { pageId: iid, tags: o.v, source: it.src }, { waits: [400, 1500] }); if (RS.tags[iid] === o) { o.pend = false; ok++; } }
+      catch (e) { failed = true; tagPending.clear(); toast("Notion のタグへの反映に失敗しました（この端末と同期先には保存済みです。あとで自動でやり直します）。\n" + e.message, 7000); break; }
+      if (tagPending.size && ok % 5 === 0) toast(`Notion のタグに反映中…（残り ${tagPending.size} 件）`, 2500);
+    }
+    tagBusy = false;
+    if (ok) { saveRS(); if (!failed && ok > 3) toast(`Notion のタグへの反映が終わりました（${ok} 件）`, 2500); }
+  }
+  function resumeTagSync() { if (!secret?.gas) return; for (const [iid, o] of Object.entries(RS.tags)) if (o.pend && S.byId.has(iid)) tagPending.add(iid); if (tagPending.size && !tagBusy) tagWorker(); }
+  function catchUpTags() {                         // Notion の書き出しが追いついたものは、手元の上書きを外す
+    let ch = false;
+    for (const x of S.items) { const o = RS.tags[x.id]; if (o && !o.pend && sameSet(o.v, x.tg || [])) { delete RS.tags[x.id]; ch = true; } }
+    if (ch) persistRS();
+  }
+  function setTags(iid, list) {
+    const it = S.byId.get(iid); if (!it) return;
+    const v = [...new Set(list.map(cleanTag).filter(Boolean))];
+    if (sameSet(v, effTags(it))) return;
+    RS.tags[iid] = { v, at: Date.now(), pend: !!secret.gas };
+    saveRS(); queueTagSync(iid);
+  }
+  const tagEditor = it => `<div class="tagedit" data-tid="${it.id}"><div class="chips">${effTags(it).map(t => `<button type="button" class="chip on" data-tagdel="${esc(t)}" title="外す">${esc(t)} ×</button>`).join("") || '<span class="recline">タグはまだありません。</span>'}</div><div class="tagadd"><input list="taglist" placeholder="タグを追加（Enter）" maxlength="100" autocomplete="off"><button type="button" class="tb" data-tagadd="1">追加</button></div></div>`;
+  function refreshTagUI(iid, keepFocus) {
+    drawTagMenu();
+    const it = S.byId.get(iid); if (!it) return;
+    $$(`[data-tid="${iid}"]`).forEach(box => { box.outerHTML = tagEditor(it); });
+    const cnt = $('#detail summary .cnt[data-tcnt]'); if (cnt) cnt.textContent = effTags(it).length;
+    if (keepFocus) $(`[data-tid="${iid}"] input`)?.focus();
+    if (S.tag !== "all") drawList();
+  }
+  function addTagFrom(iid, inp) {
+    const t = cleanTag(inp.value), it = S.byId.get(iid); if (!t || !it) return;
+    setTags(iid, [...effTags(it), t]); refreshTagUI(iid, true);
+  }
+  document.addEventListener("click", e => {
+    const del = e.target.closest("[data-tagdel]");
+    if (del) { const iid = del.closest("[data-tid]").dataset.tid, it = S.byId.get(iid); setTags(iid, effTags(it).filter(t => t !== del.dataset.tagdel)); refreshTagUI(iid); return; }
+    const add = e.target.closest("[data-tagadd]"); if (add) { const box = add.closest("[data-tid]"); addTagFrom(box.dataset.tid, box.querySelector("input")); }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.matches && e.target.matches("[data-tid] input")) { e.preventDefault(); addTagFrom(e.target.closest("[data-tid]").dataset.tid, e.target); }
+  });
+  $("#tagSel").addEventListener("change", e => { S.tag = e.target.value; closeDetail(); drawList(); });
+  $("#tagBtn").addEventListener("click", e => { const it = S.byId.get(S.cur); if (it) showPop(`<h3>タグ</h3>${tagEditor(it)}`, e.currentTarget); });
+
+  /* ---------- 選択モード(まとめてタグ付け) ---------- */
+  function updateBulk() {
+    const b = $("#bulkbar"); b.hidden = !S.selMode; if (!S.selMode) return;
+    const n = S.tsel.size;
+    b.innerHTML = `<span class="bn">${n} 件を選択</span><button class="tb" data-bk="all">すべて選ぶ</button><button class="tb" data-bk="none" ${n ? "" : "disabled"}>解除</button><button class="tb main" data-bk="add" ${n ? "" : "disabled"}>タグを付ける</button><button class="tb" data-bk="rm" ${n ? "" : "disabled"}>タグを外す</button>`;
+  }
+  function setSelMode(on) {
+    S.selMode = !!on; S.tsel.clear(); if (S.selMode) closeDetail();
+    $("#selBtn").setAttribute("aria-pressed", String(S.selMode)); $("#selBtn").textContent = S.selMode ? "選択を終える" : "選択";
+    drawList(); updateBulk();
+  }
+  $("#selBtn").addEventListener("click", () => setSelMode(!S.selMode));
+  $("#bulkbar").addEventListener("click", e => {
+    const b = e.target.closest("[data-bk]"); if (!b) return;
+    if (b.dataset.bk === "all") { visible().forEach(x => S.tsel.add(x.id)); drawList(); updateBulk(); return; }
+    if (b.dataset.bk === "none") { S.tsel.clear(); drawList(); updateBulk(); return; }
+    bulkTagDialog(b.dataset.bk);
+  });
+  function bulkTagDialog(mode) {
+    const ids = [...S.tsel].filter(id => S.byId.has(id)); if (!ids.length) return;
+    const add = mode === "add", chosen = new Set();
+    let base;
+    if (add) base = tagVocab(false).slice(0, 60);
+    else { const m = new Map(); ids.forEach(id => effTags(S.byId.get(id)).forEach(t => m.set(t, (m.get(t) || 0) + 1))); base = [...m.entries()].sort((a, b) => b[1] - a[1]); }
+    const names = () => [...new Set([...base.map(b => b[0]), ...chosen])];
+    const count = Object.fromEntries(base);
+    const chips = () => names().map(t => `<button type="button" class="chip${chosen.has(t) ? " sel" : ""}" data-bt="${esc(t)}">${esc(t)}${!add ? `（${count[t] || 0}）` : ""}</button>`).join("") || `<span class="recline">${add ? "まだタグがありません。下に入力してください。" : "選んだ動画には、タグが付いていません。"}</span>`;
+    popOpen(add ? "タグを付ける" : "タグを外す", `<p>${ids.length} 件に${add ? "付ける" : "付いている"}タグを選びます。</p>
+      <div class="chips" id="btChips" style="margin-bottom:10px">${chips()}</div>
+      ${add ? `<div class="tagadd" style="margin-bottom:10px"><input id="btIn" list="taglist" placeholder="新しいタグ（Enter で追加）" maxlength="100" autocomplete="off"><button class="tb" id="btAdd">追加</button></div>` : ""}
+      <div class="acts"><button class="tb main" id="btGo">${add ? "付ける" : "外す"}</button></div><div class="msg" id="btMsg"></div>`, () => {
+      const redraw = () => { $("#btChips").innerHTML = chips(); };
+      $("#btChips").onclick = e => { const c = e.target.closest("[data-bt]"); if (!c) return; chosen.has(c.dataset.bt) ? chosen.delete(c.dataset.bt) : chosen.add(c.dataset.bt); redraw(); };
+      const addNew = () => { const t = cleanTag($("#btIn").value); if (t) { chosen.add(t); $("#btIn").value = ""; redraw(); } };
+      if (add) { $("#btAdd").onclick = addNew; $("#btIn").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); addNew(); } }; }
+      $("#btGo").onclick = () => {
+        if (add && $("#btIn").value.trim()) addNew();
+        if (!chosen.size) { $("#btMsg").textContent = "タグを選んでください。"; return; }
+        for (const id of ids) { const it = S.byId.get(id), cur = effTags(it); setTags(id, add ? [...cur, ...chosen] : cur.filter(t => !chosen.has(t))); }
+        popClose(); drawTagMenu(); drawList(); updateBulk();
+        toast(`${ids.length} 件のタグを${add ? "付けました" : "外しました"}。${secret.gas ? "Notion にも順に反映します。" : ""}`, 3500);
+      };
+    });
+  }
+
   /* ---------- 画面内プレーヤー(動かせる・大きさを変えられる) ---------- */
   const VP_HEAD = 34;
   function vpApply() {
@@ -1715,7 +1849,11 @@ body.full #viewer{display:flex !important}
     try { S.at = ""; S.notes = null; S.night = null; S.bundles.clear(); await loadJson("index.json.age", (o, how) => o ? applyIndex(o, how) : applyIndex(null, how), true); }
     catch (e) { setStatus(e.message); }
   });
-  $("#list").addEventListener("click", e => { const b = e.target.closest(".item"); if (b) openItem(b.dataset.id); });
+  $("#list").addEventListener("click", e => {
+    const b = e.target.closest(".item"); if (!b) return;
+    if (S.selMode) { const id = b.dataset.id; S.tsel.has(id) ? S.tsel.delete(id) : S.tsel.add(id); b.classList.toggle("sel", S.tsel.has(id)); updateBulk(); return; }   // 選択モードでは、開かずに選ぶ
+    openItem(b.dataset.id);
+  });
   $("#backBtn").addEventListener("click", () => { $("#app").classList.remove("reading"); });
   $("#tile").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.tile = b.dataset.t; $$("#tile button").forEach(x => x.classList.toggle("on", x === b)); savePrefs(); drawList(); });
   $("#sort").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.sort = b.dataset.s; $$("#sort button").forEach(x => x.classList.toggle("on", x === b)); savePrefs(); drawList(); });
@@ -1753,46 +1891,21 @@ body.full #viewer{display:flex !important}
   $("#mlist").addEventListener("click", e => {
     const b = e.target.closest("button[data-act]"); if (!b) return;
     if (b.dataset.act === "open") { mode("library"); openItem(b.dataset.id); }
-    else if (b.dataset.act === "claude") claudeDialog(b.dataset.id);
+    else if (b.dataset.act === "del") deleteDups([b.dataset.id]);
     else runSummaries([b.dataset.id]);
   });
   $("#mGo").addEventListener("click", () => runSummaries([...S.sel]));
+  $("#mDel").addEventListener("click", () => deleteDups([...S.sel]));
   $("#mAll").addEventListener("click", () => {
-    const ids = S.items.filter(x => group(x.st) === "queue").map(x => x.id);
+    const ids = S.items.filter(x => grp(x) === "queue").map(x => x.id);
     const all = ids.length && ids.every(id => S.sel.has(id));
     ids.forEach(id => all ? S.sel.delete(id) : S.sel.add(id)); drawManage();
   });
-  $("#mClaude").addEventListener("click", () => claudeDialog());
   $("#mClaudeAll").addEventListener("click", () => {      // Claude.ai を開き、要約待ちの一覧表示と変換を頼む(clipstock-summarizer スキルが担当)
-    const n = S.items.filter(x => group(x.st) === "queue").length;
+    const n = S.items.filter(x => grp(x) === "queue").length;
     const q = "ClipStock の要約待ちを一覧で表示して、私が選んだものを ClipStock の形式で要約して Notion に書き込んでください。";
     window.open("https://claude.ai/new?q=" + encodeURIComponent(q), "_blank", "noopener,noreferrer");
     $("#mnote").textContent = `Claude.ai を開きました（要約待ち ${n} 件）。一覧から選んで変換すると、Notion に書き込まれます。終わったら、ここの「↻ 更新」で反映します（Mac の書き出しのあと）。`;
-  });
-  $("#mOpenGas").addEventListener("click", () => { if (secret.gas) window.open(secret.gas, "_blank", "noopener,noreferrer"); else $("#mnote").textContent = "要約の窓口（GAS）が登録されていません。"; });
-  $("#mPing").addEventListener("click", async () => {
-    const say = t => { $("#mnote").textContent = t; };
-    if (!secret.gas) return say("要約の窓口（GAS）が登録されていません。「🔒 鍵」→ 設定をやり直して URL を入れてください。");
-    const shown = secret.gas.length > 70 ? secret.gas.slice(0, 56) + "…" + secret.gas.slice(-8) : secret.gas;
-    const head = `登録中の窓口：${shown}\n`;
-    say(head + "問い合わせています…"); $("#mPing").disabled = true;
-    try { await gas("importSummary", { pageId: "", json: "", source: "video" }, { waits: [400, 1500] }); say(head + "つながりました。"); }   // 何も保存しない確認用の呼び出し
-    catch (e) {
-      const m = e.message;
-      if (/JSON/.test(m)) say(head + "つながりました。共有トークンも、要約の窓口（Summarize.gs）も正常です。");
-      else if (/Summarize\.gs/.test(m)) say(head + "窓口にはつながりましたが、Summarize.gs が入っていないか、デプロイが古いままです。\n「デプロイを管理」→ 編集 → 新しいバージョン、で更新してください。（マーカー・メモの保存だけなら動きます）");
-      else if (/共有トークン/.test(m)) say(head + "窓口にはつながりましたが、共有トークンが違います。GAS のスクリプトプロパティ ACCESS_TOKEN と同じ値で、設定をやり直してください。");
-      else if (/つながりませんでした/.test(m)) {
-        // 応答を読めない理由を切り分ける: no-cors なら、サーバーが何かを返しただけで「届いた」と分かる
-        let reach = false;
-        try { await fetch(secret.gas + (secret.gas.includes("?") ? "&" : "?") + "r=" + Date.now().toString(36), { mode: "no-cors", cache: "no-store" }); reach = true; } catch {}
-        say(head + (reach
-          ? "サーバーには届いていますが、ブラウザが応答を受け取れません。\n「窓口の URL を開く」で開いたページの文言で、原因を見分けられます。\n・「承認が必要です」「Authorization required」→ GAS の承認がまだ（SETUP の「承認」）\n・「ファイルを開くことができません」「Sorry, unable to open the file」→ アーカイブ済み・古いデプロイの URL、または URL の取り違え\n・「スクリプト関数が見つかりません: doGet」→ 届いて承認も済みですが、デプロイされている版が古い（Summarize.gs の診断用 doGet が入っていない）。新しいバージョンでデプロイし直す\n・ok: true と service: clipstock を含む JSON が出る → 版は最新。doPost や saveField が false なら、その部品が入っていない。すべて true なら一時的な失敗なので、少し待って再試行\n・Google のログイン画面 →「アクセスできるユーザー」が「全員」でない"
-          : "サーバーに届きません。ネットワーク接続と、登録した URL の綴り（https://script.google.com/macros/s/…/exec）を確認してください。"));
-      }
-      else say(m);
-    }
-    $("#mPing").disabled = false;
   });
   // ノート
   $("#notes").addEventListener("click", e => {

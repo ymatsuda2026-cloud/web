@@ -11,6 +11,7 @@ web-archive の中身(すべて age で暗号化済み。GitHub 上では読め�
   night.json.age        文字起こしの状況(夜間処理画面用)
   items/<id>.json.age   1件ぶんの本文(要約・分野別・応用・活用・マップ・文字起こし)
   thumbs/<id>.jpg.age   サムネイル(幅360に縮小)
+  clipstock-state.json.age  マーカー・メモ・読了(ブラウザが書く。ここでは触らない)
 
 使い方:
   初回     python3.14 clipstock_export.py --init          # 鍵を作る(1回だけ)
@@ -23,6 +24,8 @@ web-archive の中身(すべて age で暗号化済み。GitHub 上では読め�
   git clone git@github.com:ymatsuda2026-cloud/web-archive.git ~/clipstock-archive
   ~/.clipstock.env に NOTION_TOKEN=... など(SETUP.md 参照)
 """
+
+from __future__ import annotations
 
 import argparse
 import hashlib
@@ -81,7 +84,14 @@ def load_env(path: Path) -> dict:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             k, v = line.split("=", 1)
-            env[k.strip()] = v.strip().strip('"').strip("'")
+            v = v.strip()
+            if v[:1] in ("'", '"') and v.count(v[0]) >= 2:
+                v = v[1:v.index(v[0], 1)]            # 引用符で囲まれた値はそのまま
+            else:
+                v = re.split(r"\s+#", v, maxsplit=1)[0].strip()   # 行末コメントを外す
+                if v.startswith("#"):
+                    v = ""
+            env[k.strip()] = v
     return env
 
 
@@ -89,6 +99,9 @@ def config() -> dict:
     env = load_env(Path(os.environ.get("CLIPSTOCK_ENV", "~/.clipstock.env")).expanduser())
     env.update({k: v for k, v in os.environ.items() if k.startswith(("NOTION_", "WEB_", "VIDEO_", "ARCHIVE_", "AGE_", "STATE_"))})
     home = Path.home()
+    for k in ("NOTION_TOKEN", "WEB_NOTION_TOKEN"):
+        if env.get(k) and not env[k].isascii():
+            sys.exit(f"{k} に日本語などが混じっています(コメントの書き方を確認してください): {env[k][:20]!r}")
     return {
         "notion": env.get("NOTION_TOKEN", ""),
         "notion_web": env.get("WEB_NOTION_TOKEN", "") or env.get("NOTION_TOKEN", ""),
@@ -148,6 +161,7 @@ class Notion:
 
     def call(self, method: str, path: str, payload=None):
         for attempt in range(6):
+            time.sleep(0.34)                      # Notion は平均 3 リクエスト/秒まで
             r = self.s.request(method, f"https://api.notion.com/v1/{path}", json=payload, timeout=60)
             if r.status_code == 429:
                 time.sleep(float(r.headers.get("Retry-After", 2 ** attempt)))
@@ -240,6 +254,7 @@ def to_item(page, src: str) -> dict:
         "apply": rich(p, P_APPLY),
         "ideas": rich(p, P_IDEAS),
         "memo": rich(p, P_MEMO),
+        "tags": [o["name"] for o in ((p.get("タグ") or {}).get("multi_select") or [])],
     }
 
 
@@ -264,14 +279,14 @@ def dumps(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def index_entry(it: dict, duration: int) -> dict:
+def index_entry(it: dict, duration: int, has_tr: bool = False) -> dict:
     body = plain(it["summary"]).replace("\n", " ")[:240]
     return {
         "id": it["id"], "src": it["src"], "t": it["title"], "st": it["status"],
         "url": it["url"], "th": 1 if it["thumb"] else 0, "c": it["created"], "e": it["edited"],
-        "g": it["generated"], "d": duration, "s": body, "cat": it["category"],
+        "g": it["generated"], "d": duration, "s": body, "cat": it["category"], "tg": it["tags"],
         "h": {k: 1 for k, v in (("sm", it["summary"]), ("mm", it["mindmap"]), ("fl", it["fields"]),
-                                ("ap", it["apply"]), ("id", it["ideas"]), ("me", it["memo"])) if v},
+                                ("ap", it["apply"]), ("id", it["ideas"]), ("me", it["memo"]), ("tr", has_tr)) if v},
     }
 
 
@@ -288,13 +303,21 @@ def notes_of(it: dict) -> list:
 
 
 def make_thumb(url: str) -> bytes | None:
-    try:
-        r = requests.get(url, timeout=20)
-        r.raise_for_status()
-    except Exception as e:  # noqa: BLE001
-        print(f"  サムネ取得失敗: {e}")
+    cands = [url]
+    if "i.ytimg.com" in url and "mqdefault" in url:
+        cands.append(url.replace("mqdefault", "hqdefault"))
+    data = None
+    for u in cands:
+        try:
+            r = requests.get(u, timeout=20)
+            r.raise_for_status()
+            data = r.content
+            break
+        except Exception:  # noqa: BLE001
+            continue
+    if data is None:
+        print(f"  サムネなし(取得できず・次回から再試行しません): {url}")
         return None
-    data = r.content
     if Image is None:
         return data
     try:
@@ -371,6 +394,7 @@ def main():
         item_file = repo / "items" / f"{it['id']}.json.age"
         changed = old.get("edited") != it["edited"] or not item_file.exists()
         duration = old.get("d", 0)
+        has_tr = old.get("tr", bool(duration))
 
         # 状態の遷移(夜間処理の記録用)
         if not old:
@@ -380,12 +404,15 @@ def main():
         if it["status"] == ST_SUMMARIZED and old.get("st") != ST_SUMMARIZED:
             summarized.append(it)
 
-        if changed:
+        if changed and args.dry_run:
+            written += 1                           # 書き直す予定の件数だけ数える
+        elif changed:
             try:
                 transcript = ""
                 if it["status"] in (ST_DONE, ST_SUMMARIZED):
                     transcript = clients[it["src"]].body_text(it["id"])
                     duration = last_timecode(transcript)
+                    has_tr = bool(transcript.strip())
                 bundle = {
                     "v": 1, "id": it["id"], "src": it["src"], "title": it["title"], "url": it["url"],
                     "status": it["status"], "created": it["created"], "generated": it["generated"], "model": it["model"],
@@ -400,12 +427,21 @@ def main():
                 continue
 
         thumb_file = repo / "thumbs" / f"{it['id']}.jpg.age"
-        if it["thumb"] and (old.get("thumb") != it["thumb"] or not thumb_file.exists()):
+        tmiss = old.get("tmiss", "")
+        want = it["thumb"] and tmiss != it["thumb"] and (old.get("thumb") != it["thumb"] or not thumb_file.exists())
+        if want and args.dry_run:
+            written += 1
+        elif want:
             data = make_thumb(it["thumb"])
             if data:
                 put(f"thumbs/{it['id']}.jpg.age", sealer.seal(data))
+                tmiss = ""
+            else:
+                tmiss = it["thumb"]
 
-        new_state[it["id"]] = {"edited": it["edited"], "st": it["status"], "d": duration, "thumb": it["thumb"]}
+        new_state[it["id"]] = {"edited": it["edited"], "st": it["status"], "d": duration, "tr": has_tr, "thumb": it["thumb"], "tmiss": tmiss}
+        if (n_done := len(new_state)) % 25 == 0:
+            print(f"  進捗 {n_done}/{len(items)}")
 
     # --- 消えた/除外されたものを片づける
     live = {i["id"] for i in items}
@@ -420,7 +456,7 @@ def main():
                     written += 1
 
     # --- 一覧・ノート・夜間処理
-    entries = sorted((index_entry(i, new_state.get(i["id"], {}).get("d", 0)) for i in items), key=lambda x: x["c"], reverse=True)
+    entries = sorted((index_entry(i, new_state.get(i["id"], {}).get("d", 0), new_state.get(i["id"], {}).get("tr", False)) for i in items), key=lambda x: x["c"], reverse=True)
     notes = [n for i in items for n in notes_of(i)]
 
     cutoff = now - timedelta(hours=STALE_HOURS)
@@ -478,6 +514,9 @@ def main():
         print("commit しました(--no-push)")
         return
     r = git(repo, "push", check=False)
+    if r.returncode != 0:      # ブラウザ(ClipStock)も記録を同じリポジトリへ書き込むので、先を越されたら取り込み直して1回だけやり直す
+        git(repo, "pull", "--rebase", "--autostash", check=False)
+        r = git(repo, "push", check=False)
     print("push しました" if r.returncode == 0 else f"push に失敗: {r.stderr.strip()}")
 
 
