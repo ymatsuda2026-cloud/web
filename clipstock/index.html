@@ -526,14 +526,42 @@ details.mm[open]>summary::before{content:"▾ "}
   }
 
   /* ---------- 要約の窓口(GAS) ---------- */
-  async function gas(action, payload) {
+  /* GAS は気まぐれに失敗する(リダイレクト先が 404 になり、ブラウザには CORS エラーに見える。Notion への保存自体は成功していることもある)。
+     旧画面と同じ対策: ①1本ずつ・間隔を空けて送る ②URL に毎回違う値を付ける ③通信が失敗したときだけやり直す。
+     どの保存も「同じ値を書き直すだけ」なので、やり直しても副作用は増えない。 */
+  const DEV = ls.get("clipstock.dev", {});                // 検証用の上書き(通常は使わない)
+  const GAS_GAP = DEV.gap ?? 2500, GAS_WAITS = DEV.waits ?? [400, 1500, 4000, 10000, 20000];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let gasTail = Promise.resolve(), gasLast = 0;
+  function gasEnqueue(task) {
+    const run = gasTail.then(async () => {
+      const w = gasLast + GAS_GAP - Date.now(); if (w > 0) await sleep(w);
+      try { return await task(); } finally { gasLast = Date.now(); }
+    });
+    gasTail = run.catch(() => {}); return run;
+  }
+  async function gasPost(url, body) {
+    const target = url + (url.includes("?") ? "&" : "?") + "r=" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const r = await fetch(target, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow", body });
+    if (!r.ok) throw new Error("GAS HTTP " + r.status);
+    return r.json();
+  }
+  async function gasRetry(url, body, waits) {
+    for (let i = 0; ; i++) {
+      try { return await gasPost(url, body); }
+      catch (e) {
+        if (i >= waits.length) throw e;
+        if (i >= 1) toast(`窓口への通信をやり直しています（${i + 1}/${waits.length + 1}）…`, 3000);
+        await sleep(waits[i]);
+      }
+    }
+  }
+  async function gas(action, payload, opt = {}) {
     if (!secret.gas) throw new Error("要約の窓口（GAS）が未登録です。設定をやり直して URL を入れてください。");
-    let r;
-    try {
-      r = await fetch(secret.gas, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
-        body: JSON.stringify({ action, token: secret.gastoken, ...payload }) });
-    } catch { throw new Error("要約の窓口（GAS）につながりませんでした。\n・デプロイの「アクセスできるユーザー」が「全員」か\n・登録した URL が、最新のデプロイの /exec か\n（変換管理の「窓口の接続を確かめる」で調べられます）"); }
-    const j = await r.json().catch(() => null);
+    const body = JSON.stringify({ action, token: secret.gastoken, ...payload });
+    let j;
+    try { j = await gasEnqueue(() => gasRetry(secret.gas, body, opt.waits ?? GAS_WAITS)); }
+    catch { throw new Error("要約の窓口（GAS）につながりませんでした。\n・デプロイの「アクセスできるユーザー」が「全員」か\n・登録した URL が、最新のデプロイの /exec か\n（変換管理の「窓口の接続を確かめる」で調べられます）"); }
     if (!j) throw new Error("窓口の応答を読めませんでした。");
     if (!j.ok) {
       const er = String(j.error || "");
@@ -940,7 +968,7 @@ details.mm[open]>summary::before{content:"▾ "}
       const x = targets[i]; S.run[x.id] = "run"; drawManage();
       $("#mnote").textContent = `要約中 ${i + 1}/${targets.length}：${x.t}\n（1本あたり1〜3分ほどかかります。このまま開いておいてください）`;
       try {
-        const r = await gas("summarize", { pageId: x.id, source: x.src });
+        const r = await gas("summarize", { pageId: x.id, source: x.src }, { waits: [400, 1500] });
         applySummary(x.id, r); S.bundles.delete(x.id); delete S.run[x.id]; S.sel.delete(x.id); ok++;
         if (r.failed?.length) bad.push(`${x.t}（${r.failed.join("・")} は作れませんでした）`);
       } catch (e) { S.run[x.id] = "err"; bad.push(`${x.t}：${e.message}`); }
@@ -1453,7 +1481,7 @@ details.mm[open]>summary::before{content:"▾ "}
     const say = t => { $("#mnote").textContent = t; };
     if (!secret.gas) return say("要約の窓口（GAS）が登録されていません。「🔒 鍵」→ 設定をやり直して URL を入れてください。");
     say("窓口に問い合わせています…"); $("#mPing").disabled = true;
-    try { await gas("importSummary", { pageId: "", json: "", source: "video" }); say("つながりました。"); }   // 何も保存しない確認用の呼び出し
+    try { await gas("importSummary", { pageId: "", json: "", source: "video" }, { waits: [400, 1500] }); say("つながりました。"); }   // 何も保存しない確認用の呼び出し
     catch (e) {
       const m = e.message;
       if (/JSON/.test(m)) say("つながりました。共有トークンも、要約の窓口（Summarize.gs）も正常です。");
