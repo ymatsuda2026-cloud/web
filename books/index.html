@@ -212,6 +212,8 @@ body.imm .stage{background:var(--desk)}
 .mst.todo{background:var(--line); color:var(--muted)}
 .mst.queue{background:var(--foil-soft); color:var(--foil-text); border:1px solid var(--foil)}
 .mst.done{background:var(--cloth); color:var(--cloth-ink)}
+.mst.dup{background:transparent; color:var(--muted); border:1px dashed var(--muted)}
+.mrow .dupof{color:var(--muted); font-size:12px}
 #night{flex:1; min-height:0; overflow:auto; padding:16px 18px 48px}
 #night h2{font-family:var(--serif); font-size:18px; margin:0 0 12px}
 #night h3{font-size:14px; margin:24px 0 8px}
@@ -398,6 +400,11 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 .bprog i{display:block; height:100%; background:var(--foil)}
 .finb{font-size:10.5px; border-radius:9px; padding:0 6px; margin-left:6px; background:var(--cloth); color:var(--cloth-ink); line-height:1.7; vertical-align:1px}
 .lnk{border:0; background:none; color:var(--foil-text); font-size:12.5px; padding:4px 16px; text-align:left}
+.stsel{display:inline-flex; margin:4px 16px; border:1px solid var(--line); border-radius:6px; overflow:hidden; font-size:12.5px}
+.stsel button{border:0; background:transparent; color:var(--muted); padding:3px 11px; cursor:pointer; font:inherit}
+.stsel button+button{border-left:1px solid var(--line)}
+.stsel button[aria-pressed="true"]{background:var(--foil-soft); color:var(--foil-text); font-weight:500}
+.stsel button:focus-visible{outline:2px solid var(--foil); outline-offset:-2px}
 
 /* 本棚の表示切り替えと表紙の並び */
 .shelfbar{position:sticky; top:-8px; z-index:2; display:flex; align-items:center; gap:8px; padding:8px 14px 8px; margin-top:-8px; background:var(--paper); border-bottom:1px solid var(--line)}
@@ -518,6 +525,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       <button data-f="todo">未変換<span class="n"></span></button>
       <button data-f="queue">変換待ち<span class="n"></span></button>
       <button data-f="done">変換済み<span class="n"></span></button>
+      <button data-f="dup">重複<span class="n"></span></button>
     </div>
     <div class="seg" id="mview" role="group" aria-label="表示の形">
       <button data-v="list">一覧</button>
@@ -527,6 +535,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     <span class="sp"></span>
     <button class="tb main" id="mAdd" disabled>変換待ちにする</button>
     <button class="tb" id="mDel" disabled>変換待ちから外す</button>
+    <button class="tb" id="mNotDup" disabled hidden title="同じ書名の別の本を誤って重複と判定したとき">別の本として扱う</button>
   </div>
   <p class="mnote" id="mnote"></p>
   <div class="mlist" id="mlist"></div>
@@ -827,13 +836,15 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
   // 本棚の絞り込み・並べ替え・分け方（この端末に保存）
   S.shelfF = ls.get("shoko.shelff", "all"); S.shelfSort = ls.get("shoko.shelfsort", "recent"); S.shelfGroup = ls.get("shoko.shelfgroup", "none");
-  const stateOf = id => RS.fin[id]?.v ? "done" : RS.pos[id] ? "reading" : "unread";
-  const isNew = b => !!S.prevSeen && !RS.pos[b.id] && Date.parse(b.converted || "") > S.prevSeen;
+  // 読んだ位置。「未読にする」で消した本は { gone:true, at } の印が残る（同期で古い位置が戻らないように）
+  const livePos = id => { const p = RS.pos[id]; return p && !p.gone ? p : null; };
+  const stateOf = id => RS.fin[id]?.v ? "done" : livePos(id) ? "reading" : "unread";
+  const isNew = b => !!S.prevSeen && !livePos(b.id) && Date.parse(b.converted || "") > S.prevSeen;
   function shelfList() {
     const q = S.q.toLowerCase();
     const list = S.books.filter(b => (!q || (b.title + " " + authorsOf(b)).toLowerCase().includes(q)) && (S.shelfF === "all" || stateOf(b.id) === S.shelfF));
     const cmp = {
-      recent:(a, b) => (RS.pos[b.id]?.at || 0) - (RS.pos[a.id]?.at || 0) || String(b.converted || "").localeCompare(String(a.converted || "")),
+      recent:(a, b) => (livePos(b.id)?.at || 0) - (livePos(a.id)?.at || 0) || String(b.converted || "").localeCompare(String(a.converted || "")),
       added:(a, b) => String(b.converted || "").localeCompare(String(a.converted || "")),
       title:(a, b) => String(a.title).localeCompare(String(b.title), "ja"),
       author:(a, b) => authorsOf(a).localeCompare(authorsOf(b), "ja") || String(a.title).localeCompare(String(b.title), "ja"),
@@ -862,11 +873,11 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       ${sel("shelfGroup", "分け方", S.shelfGroup, [["none","分けない"],["author","著者で分ける"],["series","シリーズで分ける"],["tag","タグで分ける"],["type","種類で分ける"]])}
       ${nNew ? `<span class="newb" style="align-self:center">新着 ${nNew}</span>` : ""}</div>`;
   }
-  const progOf = id => RS.fin[id]?.v ? 1 : (RS.pos[id]?.pct || 0);
+  const progOf = id => RS.fin[id]?.v ? 1 : (livePos(id)?.pct || 0);
   function resumeBtn(b) {
-    const p = RS.pos[b.id]; if (!p || RS.fin[b.id]?.v) return "";
-    const t = titleFor(b, p.no);
-    return `<button class="resume" data-cont="${esc(b.id)}"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l6 4-6 4z" fill="var(--foil)"/></svg>続きから読む（${t ? esc(t) + "・" : ""}${Math.round((p.pct || 0) * 100)}%）</button>`;
+    const p = livePos(b.id); if (!p || !p.block) return "";
+    const t = titleFor(b, p.no), fin = RS.fin[b.id]?.v;
+    return `<button class="resume" data-cont="${esc(b.id)}"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l6 4-6 4z" fill="var(--foil)"/></svg>${fin ? "前回の位置から読む" : "続きから読む"}（${t ? esc(t) + "・" : ""}${Math.round((p.pct || 0) * 100)}%）</button>`;
   }
   S.acc = ls.get("shoko.acc", {});           // 開いている項目（本棚・小窓で共通）：{ "toc": true, "notes": false }
   function notesMini(b, curNo) {
@@ -885,7 +896,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     const d = e.target; if (!(d instanceof HTMLDetailsElement) || !d.dataset.acck || d.closest("#pop")) return;
     S.acc[d.dataset.acck] = d.open; ls.set("shoko.acc", S.acc);
   }, true);
-  const finBtn = b => `<button class="lnk" data-fin="${esc(b.id)}">${RS.fin[b.id]?.v ? "未読に戻す" : "読了にする"}</button>`;
+  const finBtn = b => { const st = stateOf(b.id);
+    return `<span class="stsel" role="group" aria-label="読書の状態">${[["unread","未読"],["reading","読書中"],["done","読了"]].map(([k, l]) =>
+      `<button type="button" data-setst="${k}" data-bid="${esc(b.id)}" aria-pressed="${st === k}">${l}</button>`).join("")}</span>`; };
   const metaLine = b => `${esc(authorsOf(b))}${authorsOf(b) ? "　" : ""}${esc(typeLabel(b.type))}・${chapterGroups(b).length}章${S.saved.has(b.id) ? '<span class="offl">保存済み</span>' : ""}${RS.fin[b.id]?.v ? '<span class="finb">読了</span>' : ""}`;
   const progBar = b => progOf(b.id) ? `<span class="bprog" style="display:block"><i style="width:${Math.round(progOf(b.id) * 100)}%"></i></span>` : "";
   function renderShelf() {
@@ -940,8 +953,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     if (sf) { S.shelfF = sf.dataset.sf; ls.set("shoko.shelff", S.shelfF); renderShelf(); return; }
     const ct = e.target.closest("[data-cont]");
     if (ct) return resumeBook(ct.dataset.cont);
-    const fn = e.target.closest("[data-fin]");
-    if (fn) { const id = fn.dataset.fin; RS.fin[id] = { v:!RS.fin[id]?.v, at:Date.now() }; saveRS(); renderShelf(); return; }
+    const ss = e.target.closest("[data-setst]");
+    if (ss) { setReadState(ss.dataset.bid, ss.dataset.setst); return; }
     const sv = e.target.closest("[data-sv]");
     if (sv) { if (sv.dataset.sv !== S.shelfView) { S.shelfView = sv.dataset.sv; ls.set("shoko.shelfview", S.shelfView); S.gridBook = null; renderShelf(); } return; }
     const gbk = e.target.closest("[data-gb]");
@@ -1431,7 +1444,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
 
   /* ---------- 変換管理（未変換・変換待ち・変換済み） ---------- */
   const M = { f:"all", q:"", sel:new Set(), limit:300, view:ls.get("shoko.mview", "list") };
-  const ST_LABEL = { todo:"未変換", queue:"変換待ち", done:"変換済み" };
+  const ST_LABEL = { todo:"未変換", queue:"変換待ち", done:"変換済み", dup:"重複" };
   const b64big = u => { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
   const apiHeaders = () => ({ Authorization:"Bearer " + secret.token, Accept:"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" });
 
@@ -1504,6 +1517,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       });
       const seen = new Set();
       S.inv = (inv.books || []).filter(b => b.bid && !seen.has(b.bid) && seen.add(b.bid));
+      S.invById = new Map(S.inv.map(b => [b.bid, b]));
       await loadQueue();
       if (S.settings == null) await loadSettings().catch(() => {});   // 「約○日で終わります」の計算に使う
       M.sel.clear();
@@ -1511,12 +1525,22 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     } catch (e) { $("#mlist").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
   }
 
-  const stOf = (bid, qset) => S.catalog[bid] ? "done" : qset.has(bid) ? "queue" : "todo";
+  // 重複：Mac が本の一覧に付けた印（dup_of）。書庫で「別の本として扱う」にした本は、Mac の次の実行を待たずに外す
+  const notDup = () => new Set(S.settings?.not_dup || []);
+  const dupOf = bid => { const b = S.invById?.get(bid); return b?.dup_of && !notDup().has(bid) ? b.dup_of : null; };
+  const stOf = (bid, qset) => S.catalog[bid] ? "done" : dupOf(bid) ? "dup" : qset.has(bid) ? "queue" : "todo";
+  function dupNote(bid) {
+    const k = dupOf(bid); if (!k) return "";
+    const kb = S.invById.get(k) || S.catalog[k], qs = new Set((S.queue || []).map(x => x.bid));
+    const where = S.catalog[k] ? "変換済み" : qs.has(k) ? "変換待ち" : "未変換";
+    return `${where}の${esc(typeLabel(kb?.type || ""))}（${esc(kb?.path || kb?.title || k)}）と同じ本`;
+  }
   function renderManage() {
     if (!S.inv) return;
     const qpos = new Map(S.queue.map((x, i) => [x.bid, i]));
     const qset = new Set(qpos.keys());
-    const cnt = { all:S.inv.length, todo:0, queue:0, done:0 };
+    S.invById = S.invById || new Map(S.inv.map(b => [b.bid, b]));
+    const cnt = { all:S.inv.length, todo:0, queue:0, done:0, dup:0 };
     for (const b of S.inv) cnt[stOf(b.bid, qset)]++;
     document.querySelectorAll("#mfilter button").forEach(b => {
       b.classList.toggle("on", b.dataset.f === M.f);
@@ -1527,8 +1551,9 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
           ? `変換待ちは ${cnt.queue} 冊です。Mac は毎日23時に、上から順に1日${dailyLimit()}冊まで変換します（今のままなら約${daysLeft(cnt.queue, dailyLimit())}日で終わります）。上限は「夜間処理の状況」で変えられます。`
           : `変換待ちは ${cnt.queue} 冊です。Mac は次の23時の実行で全部変換します（1日の上限なし）。`)
       : "未変換の本を選んで「変換待ちにする」を押すと、Mac が毎日23時に変換します。";
+    if (cnt.dup) $("#mnote").textContent += `　同じ本が複数ある ${cnt.dup} 冊は「重複」として変換しません（誤りなら選んで「別の本として扱う」）。`;
     const q = M.q.toLowerCase();
-    const rank = b => { const st = stOf(b.bid, qset); return st === "queue" ? qpos.get(b.bid) : st === "todo" ? 1e6 : 2e6; };
+    const rank = b => { const st = stOf(b.bid, qset); return st === "queue" ? qpos.get(b.bid) : st === "todo" ? 1e6 : st === "dup" ? 1.5e6 : 2e6; };
     const list = S.inv
       .filter(b => M.f === "all" || stOf(b.bid, qset) === M.f)
       .filter(b => !q || (b.title + " " + (b.authors || []).join(" ")).toLowerCase().includes(q))
@@ -1542,7 +1567,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
         const st = stOf(b.bid, qset), on = M.sel.has(b.bid);
         const label = st === "queue" ? `待ち ${qpos.get(b.bid) + 1}` : ST_LABEL[st];
         const au = (b.authors || []).join(" / ");
-        return `<label class="mcard ${st}${on ? " sel" : ""}" title="${esc(b.title)}">
+        return `<label class="mcard ${st}${on ? " sel" : ""}" title="${esc(b.title)}${st === "dup" ? "（" + dupNote(b.bid).replace(/<[^>]*>/g, "") + "）" : ""}">
           <input type="checkbox" data-mb="${esc(b.bid)}"${on ? " checked" : ""}${st === "done" ? " disabled" : ""} aria-label="${esc(b.title)}を選ぶ">
           <span class="mst ${st}">${label}</span>
           <span class="mcover" style="--h:${hashHue(b.title)}" data-thumb="${esc(b.bid)}">
@@ -1561,7 +1586,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       const label = st === "queue" ? `変換待ち ${qpos.get(b.bid) + 1}番目` : ST_LABEL[st];
       return `<label class="mrow">
         <input type="checkbox" data-mb="${esc(b.bid)}"${on ? " checked" : ""}${st === "done" ? " disabled" : ""} aria-label="${esc(b.title)}を選ぶ">
-        <span><span class="mt">${esc(b.title)}</span><br><span class="mm">${esc((b.authors || []).join(" / "))}${(b.authors || []).length ? "　" : ""}${esc(typeLabel(b.type))}${b.added ? "・" + esc(b.added) + " 追加" : ""}</span></span>
+        <span><span class="mt">${esc(b.title)}</span><br><span class="mm">${esc((b.authors || []).join(" / "))}${(b.authors || []).length ? "　" : ""}${esc(typeLabel(b.type))}${b.added ? "・" + esc(b.added) + " 追加" : ""}</span>${st === "dup" ? `<br><span class="dupof">${dupNote(b.bid)}</span>` : ""}</span>
         <span class="mst ${st}">${label}</span>
       </label>`;
     }).join("") + (list.length > shown.length ? `<button class="mmore" id="mMore">さらに表示（残り ${list.length - shown.length} 冊）</button>` : "");
@@ -1570,7 +1595,11 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   function updateMButtons(qset = new Set((S.queue || []).map(x => x.bid))) {
     const sel = [...M.sel];
     const nAdd = sel.filter(b => stOf(b, qset) === "todo").length, nDel = sel.filter(b => stOf(b, qset) === "queue").length;
+    const nDup = sel.filter(b => stOf(b, qset) === "dup").length;
     $("#mAdd").disabled = !nAdd; $("#mDel").disabled = !nDel;
+    $("#mNotDup").hidden = !nDup; $("#mNotDup").disabled = !nDup;
+    $("#mNotDup").textContent = nDup ? `別の本として扱う（${nDup}）` : "別の本として扱う";
+    $("#mAdd").title = sel.some(b => stOf(b, qset) === "dup") ? "重複している本は変換待ちにできません" : "";
     $("#mAdd").textContent = nAdd ? `変換待ちにする（${nAdd}）` : "変換待ちにする";
     $("#mDel").textContent = nDel ? `変換待ちから外す（${nDel}）` : "変換待ちから外す";
   }
@@ -1653,6 +1682,17 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
 
   $("#mAdd").onclick = () => changeQueue(true);
+  $("#mNotDup").onclick = async () => {
+    const qset = new Set(S.queue.map(x => x.bid)), btn = $("#mNotDup");
+    const ids = [...M.sel].filter(b => stOf(b, qset) === "dup");
+    if (!ids.length) return;
+    btn.disabled = true; btn.textContent = "保存中…";
+    try {
+      await saveSettings({ not_dup:[...new Set([...(S.settings?.not_dup || []), ...ids])] });
+      M.sel.clear(); renderManage();
+      status(`${ids.length} 冊を別の本として扱います。変換待ちにできるようになりました。`); setTimeout(() => status(""), 4000);
+    } catch (e) { status(e.message); setTimeout(() => status(""), 5000); updateMButtons(); }
+  };
   $("#mDel").onclick = () => changeQueue(false);
 
   /* ---------- 夜間処理の設定（settings.json.age）：1日に変換する上限など。Mac は毎回の実行の最初に読む ---------- */
@@ -1723,7 +1763,8 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   function renderNight() {
     const el = $("#night"), st = N.st, runs = st?.runs || [], last = runs[0];
     const limit = dailyLimit();
-    const qLeft = (S.queue || []).filter(x => !S.catalog[x.bid]).length;
+    if (S.inv && !S.invById) S.invById = new Map(S.inv.map(b => [b.bid, b]));
+    const qLeft = (S.queue || []).filter(x => !S.catalog[x.bid] && !dupOf(x.bid)).length;
     const todo = S.inv ? S.inv.filter(b => !S.catalog[b.bid]).length : null;
     const ok = last && last.code === 0 && !(last.errors || []).length;
     let h = `<h2>夜間処理の状況</h2><div class="nmet">`;
@@ -1963,10 +2004,23 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     ls.set(RS_KEY, RS); SY.dirty = true;
   }, 30000);
 
+  // 読書の状態を手で変える（本棚の「未読・読書中・読了」）
+  function setReadState(bid, st) {
+    const now = Date.now(), b = S.catalog[bid];
+    if (st === "done") RS.fin[bid] = { v:true, at:now };                 // 読んだ位置は残す（読み返せるように）
+    else {
+      RS.fin[bid] = { v:false, at:now };
+      if (st === "unread") RS.pos[bid] = { gone:true, at:now };          // 位置を消した印（同期で古い位置が戻らない）
+      else if (!livePos(bid)) RS.pos[bid] = { no:b?.chapters?.[0]?.no ?? 1, block:null, off:0, pct:0, at:now };
+    }
+    saveRS(true); renderShelf();
+    status(`「${b?.title || ""}」を${{ unread:"未読", reading:"読書中", done:"読了" }[st]}にしました。`); setTimeout(() => status(""), 2500);
+  }
+
   function openBook(bid) {
     const b = S.catalog[bid]; if (!b) return;
     if (S.cur?.bid === bid && S.ch && L) { if (mobile()) setMobile("reader"); return; }   // 開いている本ならそのまま
-    if (RS.pos[bid] && !RS.fin[bid]?.v) return resumeBook(bid);
+    if (livePos(bid)) return resumeBook(bid);                       // 読了の本も、前回の位置から
     const bm = S.bms[bid];
     if (bm && (b.chapters || []).some(c => c.no === bm.no)) return openChapter(bid, bm.no, false, () => jump(bm.block, true, bm.off));
     openChapter(bid, b.chapters?.[0]?.no ?? 1);
@@ -1982,16 +2036,18 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
   }
   function lastReadBook() {
     let best = null;
-    for (const [bid, p] of Object.entries(RS.pos)) if (S.catalog[bid] && !RS.fin[bid]?.v && (!best || p.at > RS.pos[best].at)) best = bid;
+    // 読了の本も対象（読み返している途中なら、その位置から）。読み終えた直後（最後のあたり）だけは除く
+    for (const [bid, p] of Object.entries(RS.pos))
+      if (S.catalog[bid] && p && !p.gone && !(RS.fin[bid]?.v && (p.pct || 0) >= 0.98) && (!best || p.at > RS.pos[best].at)) best = bid;
     return best;
   }
   // 1. 続きから読む
   function resumeBook(bid, quiet) {
-    const p = RS.pos[bid], b = S.catalog[bid]; if (!b) return;
+    const p = livePos(bid), b = S.catalog[bid]; if (!b) return;
     const no = p && (b.chapters || []).some(c => c.no === p.no) ? p.no : b.chapters?.[0]?.no;
     if (no == null) return;
     if (S.panel) setPanel(null);
-    openChapter(bid, no, quiet, p ? () => jump(p.block, true, p.off) : null);
+    openChapter(bid, no, quiet, p?.block ? () => jump(p.block, true, p.off) : null);
   }
 
   /* ================= 30. 開くのを速く：前回の本を先に取り寄せておく ================= */
