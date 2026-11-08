@@ -735,10 +735,14 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     if (location.hash === "#manage") return setPanel("manage");
     if (location.hash === "#night") return setPanel("night");
     S.prevSeen = ls.get("shoko.seen", 0); ls.set("shoko.seen", Date.now());
-    syncPull().then(() => renderShelf());
+    // ほかの端末で読んだ位置を先に取り込む（通信が遅い・できないときは 2.5 秒で諦めて、この端末の記録で開く）
+    const pulled = Promise.all([syncPull(), posPull()]);
+    await Promise.race([pulled, new Promise(r => setTimeout(r, 2500))]);
+    pulled.then(() => renderShelf());
+    // どの端末でも、最後に読んでいた本の、その位置から開く
     const lr = lastReadBook();
-    if (lr && !mobile()) resumeBook(lr, true);
-    else { const last = ls.get(LAST, null); if (last && S.catalog[last.bid] && !mobile()) openChapter(last.bid, last.no, true); }
+    if (lr) resumeBook(lr, true);
+    else { const last = ls.get(LAST, null); if (last && S.catalog[last.bid]) openChapter(last.bid, last.no, true); }
     if (lr) setTimeout(() => prefetchBook(lr), 1500);
   }
 
@@ -1852,6 +1856,75 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
     SY.busy = false;
   }
 
+  /* 最後に読んでいた位置だけを小さなファイルに分けて、すぐ送る（reader/pos.json.age）。
+     読書の記録全体（マーカー・メモ・読書時間も入って大きい）は閉じる間際の送信が切られることがあるので、
+     「次に開いたとき、どの端末でもこの位置から」を確実にするために別にする */
+  const POS_PATH = "reader/pos.json.age";
+  const DEV = ls.get("shoko.dev", null) || (() => { const id = Math.random().toString(36).slice(2, 10); ls.set("shoko.dev", id); return id; })();
+  const SP = { sha:null, timer:0, last:null, busy:false };
+  function queuePos(bid) {
+    if (!RS.pos[bid]) return;
+    SP.last = { bid, ...RS.pos[bid], dev:DEV };
+    clearTimeout(SP.timer); SP.timer = setTimeout(() => posPush(), 5000);
+  }
+  async function posPull() {
+    if (!secret || !navigator.onLine) return null;
+    try {
+      const r = await fetch(apiURL(POS_PATH), { cache:"no-store", headers:apiHeaders() });
+      if (r.status === 404) { SP.sha = null; return null; }
+      if (!r.ok) return null;
+      const j = await r.json(); SP.sha = j.sha;
+      const p = JSON.parse(await dec.decrypt(unb64(String(j.content || "").replace(/\s/g, "")), "text"));
+      if (p?.bid && (p.at || 0) > (RS.pos[p.bid]?.at || 0)) {          // 新しければ読書の記録に入れる
+        const { bid, dev, ...pos } = p; RS.pos[bid] = pos; ls.set(RS_KEY, RS);
+      }
+      return p;
+    } catch { return null; }
+  }
+  async function posPush(keepalive) {
+    clearTimeout(SP.timer);
+    const sec = secret, mine = SP.last;
+    if (!sec || !mine || !navigator.onLine || SP.busy) return;
+    SP.busy = true;
+    const url = `https://api.github.com/repos/${encodeURIComponent(sec.owner)}/${encodeURIComponent(sec.repo)}/contents/${POS_PATH}`;
+    const hd = { Authorization:"Bearer " + sec.token, Accept:"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28" };
+    try {
+      for (let tryNo = 0; tryNo < 2; tryNo++) {
+        const e = new AgeLib.Encrypter();
+        e.addRecipient(await AgeLib.identityToRecipient(sec.key));
+        const body = { message:"読んでいる位置を更新", content:b64big(await e.encrypt(JSON.stringify(mine))) };
+        if (SP.sha) body.sha = SP.sha;
+        const r = await fetch(url, { method:"PUT", keepalive:!!keepalive, headers:{ ...hd, "Content-Type":"application/json" }, body:JSON.stringify(body) });
+        if (r.ok) { SP.sha = (await r.json()).content?.sha || null; if (SP.last === mine) SP.last = null; break; }
+        if (r.status === 409 || r.status === 422) {      // 別の端末が先に書いていた → 向こうが新しければ譲る
+          const other = await posPull();
+          if (other && (other.at || 0) > (mine.at || 0)) { if (SP.last === mine) SP.last = null; break; }
+          continue;
+        }
+        break;
+      }
+    } catch {}
+    SP.busy = false;
+  }
+  // 閉じる・ほかのアプリに移る：位置をすぐ送る（小さいので途中で切られにくい）
+  let hiddenAt = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { hiddenAt = Date.now(); if (SP.last) posPush(true); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 20000) offerRemotePos();
+  });
+  addEventListener("pagehide", () => { if (SP.last) posPush(true); });
+  // 書庫を開いたまま、ほかの端末で読み進めてから戻ってきたとき：勝手には動かさず、案内を出す
+  async function offerRemotePos() {
+    const mineAt = Math.max(0, ...Object.values(RS.pos).map(p => p?.at || 0));
+    const curBlock = S.cur && L ? (L.scroll ? S.sa?.block : anchorAt()?.block) : null;
+    const r = await posPull();
+    if (!r || r.dev === DEV || (r.at || 0) <= mineAt || !S.catalog[r.bid]) return;
+    if (S.cur?.bid === r.bid && curBlock === r.block) return;
+    const b = S.catalog[r.bid];
+    toast(`別の端末で読んだ続きがあります：${b.title}（${Math.round((r.pct || 0) * 100)}%）`, "続きへ移動",
+          () => resumeBook(r.bid), 15000);
+  }
+
   // ページを表示したあとに呼ばれる：読み位置・読了・読んだページを記録
   let posT = 0, lastAct = Date.now();
   ["pointerdown", "keydown", "wheel", "touchstart"].forEach(t => addEventListener(t, () => { lastAct = Date.now(); }, { passive:true, capture:true }));
@@ -1871,6 +1944,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       const off = bookOffset(), total = bookTotal(), last = Math.min(L.pages, S.page + L.n);
       const pct = total ? Math.min(1, ((off ?? 0) + last) / total) : 0;
       RS.pos[S.cur.bid] = { no:S.cur.no, block:a.block, off:a.off, pct:Math.round(pct * 1000) / 1000, at:Date.now() };
+      queuePos(S.cur.bid);
       const chs = chaptersOf();
       if (chs.length && S.ch.no === chs[chs.length - 1].no && last >= L.pages && !RS.fin[S.cur.bid]?.v) {
         RS.fin[S.cur.bid] = { v:true, at:Date.now() };
@@ -2500,6 +2574,7 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       const a = S.sa; if (!a || !L?.scroll || !S.cur) return;
       const p = progressOf(a.block, a.off);
       RS.pos[S.cur.bid] = { no:noOf(a.block), block:a.block, off:a.off, pct:Math.round(p * 1000) / 1000, at:Date.now() };
+      queuePos(S.cur.bid);
       if (!RS.fin[S.cur.bid]?.v && scMax() > 0 && scPos() >= scMax() - 8) {
         RS.fin[S.cur.bid] = { v:true, at:Date.now() }; status("この本を読み終えました。"); setTimeout(() => status(""), 3000);
       }
@@ -2632,16 +2707,25 @@ mark.hl.memo{text-decoration:underline dotted var(--foil) 2px; text-underline-of
       });
     } catch (err) { b.disabled = false; b.textContent = "この図を消す"; figToast(err.message); }
   });
-  let ftT = 0, ftUndo = null;
-  function figToast(msg, undo) {
+  // 画面の下の小さな案内。ボタンの文字と押したときの動きは呼ぶ側が決める
+  let ftT = 0, ftAct = null;
+  function toast(msg, label, act, ms) {
     const t = $("#ftoast"); clearTimeout(ftT);
-    $("#ftoastMsg").textContent = msg; ftUndo = undo || null; $("#ftoastUndo").hidden = !undo;
-    t.hidden = false; ftT = setTimeout(() => { t.hidden = true; ftUndo = null; }, undo ? 7000 : 5000);
+    $("#ftoastMsg").textContent = msg; ftAct = act || null;
+    $("#ftoastUndo").hidden = !act; $("#ftoastUndo").textContent = label || "";
+    t.hidden = false; ftT = setTimeout(() => { t.hidden = true; ftAct = null; }, ms || (act ? 7000 : 5000));
   }
-  $("#ftoastUndo").onclick = async () => {
-    const u = ftUndo; if (!u) return;
-    ftUndo = null; $("#ftoastUndo").hidden = true; $("#ftoastMsg").textContent = "戻しています…";
-    try { await u(); figToast("図を戻しました"); } catch (err) { figToast(err.message); }
+  function figToast(msg, undo) {
+    toast(msg, "元に戻す", undo && (async () => {
+      $("#ftoastMsg").textContent = "戻しています…";
+      try { await undo(); figToast("図を戻しました"); } catch (err) { figToast(err.message); }
+    }));
+  }
+  $("#ftoastUndo").onclick = () => {
+    const a = ftAct; if (!a) return;
+    ftAct = null; $("#ftoastUndo").hidden = true;
+    if ($("#ftoastUndo").textContent !== "元に戻す") $("#ftoast").hidden = true;
+    a();
   };
   // この章の挿絵（「どの段落のあとか」の番号の順。段落が本文から消えていても、その位置に置く）
   function figuresFor(ch) {
