@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>ClipStock 要約待ちを要約する</title>
+<style>
+:root{
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  --cloth:#26335a; --cloth-ink:#e9ecf4; --foil:#a9822a; --foil-text:#7d5f17; --foil-soft:rgba(169,130,42,.14);
+  --desk:#eceae3; --paper:#ffffff; --sheet:#f7f5ef; --ink:#1c222c; --muted:#5d6678; --line:#dcd8cd;
+  --danger:#a33a2b; --ok:#2f6b4f; --run:#2d5fa8; --warn:#9a6a10;
+  --serif:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --cloth:#121a30; --cloth-ink:#dfe4f0; --foil:#d7b25a; --foil-text:#d7b25a; --foil-soft:rgba(215,178,90,.16);
+    --desk:#101318; --paper:#1a1f29; --sheet:#151922; --ink:#e6e9f0; --muted:#9aa3b5; --line:#2c3342;
+    --danger:#e08a7b; --ok:#7fbf9c; --run:#8db4ee; --warn:#e0b25a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --cloth:#121a30; --cloth-ink:#dfe4f0; --foil:#d7b25a; --foil-text:#d7b25a; --foil-soft:rgba(215,178,90,.16);
+  --desk:#101318; --paper:#1a1f29; --sheet:#151922; --ink:#e6e9f0; --muted:#9aa3b5; --line:#2c3342;
+  --danger:#e08a7b; --ok:#7fbf9c; --run:#8db4ee; --warn:#e0b25a; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0; background:var(--desk); color:var(--ink); font:15px/1.7 var(--sans); -webkit-text-size-adjust:100%}
+:focus-visible{outline:2px solid var(--foil); outline-offset:2px; border-radius:4px}
+button{font:inherit; color:inherit; cursor:pointer}
+.top{background:var(--cloth); color:var(--cloth-ink); padding:18px 20px 16px}
+.top-in{max-width:880px; margin:0 auto; display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap}
+.top h1{font:600 21px/1.35 var(--serif); margin:0; letter-spacing:.02em}
+.top p{margin:4px 0 0; font-size:13px; opacity:.82; max-width:36em}
+.top .grow{flex:1 1 260px}
+.ghost{border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.08); color:var(--cloth-ink); border-radius:6px; min-height:36px; padding:0 14px; font-size:13.5px}
+.ghost:hover{border-color:var(--foil)}
+.ghost[disabled]{opacity:.5; cursor:default}
+main{max-width:880px; margin:0 auto; padding:16px 16px 160px}
+#banner{margin:0 0 12px}
+.note{border:1px solid var(--line); border-left:4px solid var(--foil); background:var(--paper); border-radius:6px; padding:10px 14px; font-size:13.5px; line-height:1.75}
+.note.err{border-left-color:var(--danger)} .note.ok{border-left-color:var(--ok)}
+.note b{font-weight:600}
+.note .act{margin-top:8px; display:flex; gap:8px; flex-wrap:wrap}
+.btn{border:1px solid var(--line); background:var(--paper); border-radius:6px; min-height:36px; padding:0 14px; font-size:13.5px}
+.btn:hover{border-color:var(--foil)}
+.btn.primary{background:var(--cloth); color:var(--cloth-ink); border-color:var(--cloth); font-weight:600}
+.btn.primary:hover{border-color:var(--foil)}
+.btn[disabled]{opacity:.45; cursor:default; border-color:var(--line)}
+.tools{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px}
+.tools input[type=search]{flex:1 1 200px; min-width:0; border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:6px; min-height:36px; padding:0 12px; font:inherit; font-size:14px}
+.tools select{border:1px solid var(--line); background:var(--paper); color:var(--ink); border-radius:6px; min-height:36px; padding:0 8px; font:inherit; font-size:13.5px}
+.tools label.sw{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted)}
+.count{font-size:12.5px; color:var(--muted); margin-left:auto}
+ul#list{list-style:none; margin:0; padding:0; display:grid; gap:8px}
+.row{display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:start; background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px 14px}
+.row.sel{border-color:var(--foil); box-shadow:0 0 0 1px var(--foil) inset; background:color-mix(in srgb, var(--paper) 92%, var(--foil))}
+.row.dup{opacity:.62}
+.chk{display:flex; padding-top:3px}
+.chk input{width:20px; height:20px; accent-color:var(--cloth)}
+.t{font:600 15px/1.55 var(--serif); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-all}
+.m{font-size:12.5px; color:var(--muted); margin-top:2px}
+.tag{display:inline-block; font-size:11px; border:1px solid var(--line); border-radius:9px; padding:0 7px; margin-left:6px; line-height:1.6}
+.tag.long{color:var(--warn); border-color:var(--warn)}
+.tag.dup{color:var(--danger); border-color:var(--danger)}
+.stage{font-size:12.5px; color:var(--run); margin-top:6px; min-height:0}
+.stage:empty{display:none}
+.stage.ng{color:var(--danger)}
+.side{display:flex; flex-direction:column; align-items:flex-end; gap:6px}
+.chip{font-size:12px; border-radius:11px; padding:1px 10px; border:1px solid var(--line); color:var(--muted); white-space:nowrap}
+.chip.run{color:var(--run); border-color:var(--run)} .chip.ok{color:var(--ok); border-color:var(--ok)} .chip.ng{color:var(--danger); border-color:var(--danger)}
+.chip.run::before{content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.chip.run::before{animation:none}}
+.side a{font-size:12px; color:var(--foil-text)}
+details.res{margin-top:8px; font-size:13px}
+details.res summary{cursor:pointer; color:var(--foil-text)}
+.resbody{margin-top:6px; padding:10px 12px; background:var(--sheet); border-radius:6px; font:14px/1.85 var(--serif); white-space:pre-wrap; max-height:320px; overflow:auto}
+.empty{color:var(--muted); text-align:center; padding:36px 12px; border:1px dashed var(--line); border-radius:8px}
+#bar{position:fixed; left:0; right:0; bottom:0; z-index:5; background:var(--cloth); color:var(--cloth-ink); padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px)); box-shadow:0 -8px 24px rgba(10,14,30,.25)}
+#bar .in{max-width:880px; margin:0 auto; display:grid; gap:8px}
+#bar .sum{font-size:13.5px; display:flex; gap:6px 14px; flex-wrap:wrap; align-items:baseline}
+#bar .sum b{font-size:17px; font-weight:600}
+.meter{height:6px; border-radius:3px; background:rgba(255,255,255,.18); overflow:hidden}
+.meter i{display:block; height:100%; width:0; background:var(--foil); transition:width .2s}
+.meter.over i{background:#d98a5c}
+#bar .btns{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+#bar .btn{background:transparent; color:var(--cloth-ink); border-color:rgba(255,255,255,.35)}
+#bar .btn.primary{background:var(--foil); color:#1b1606; border-color:var(--foil); margin-left:auto}
+#bar .btn[disabled]{opacity:.4}
+.overall{height:4px; background:rgba(255,255,255,.18); border-radius:2px; overflow:hidden}
+.overall i{display:block; height:100%; width:0; background:#fff; opacity:.85; transition:width .3s}
+details#logWrap{margin-top:18px; font-size:13px}
+details#logWrap summary{cursor:pointer; color:var(--muted)}
+ol#log{list-style:none; margin:8px 0 0; padding:0; display:grid; gap:2px; font-size:12.5px; color:var(--muted); max-height:240px; overflow:auto}
+ol#log li{display:grid; grid-template-columns:auto 1fr; gap:10px}
+ol#log time{font-variant-numeric:tabular-nums; opacity:.8}
+ol#log li.err{color:var(--danger)}
+@media (max-width:560px){
+  .row{grid-template-columns:auto minmax(0,1fr); }
+  .side{grid-column:2; flex-direction:row; align-items:center; justify-content:space-between}
+  #bar .btn.primary{margin-left:0; flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="grow"><h1>要約待ちを要約する</h1><p>Notion の動画DBで「完了」（文字起こし済み）の動画を選び、Claude が ClipStock の形式（サマリ・マップ・分野別・応用・活用）に要約して、Notion に書き込みます。</p></div>
+  <button class="ghost" id="reload" type="button">↻ 再取得</button>
+</div></header>
+<main>
+  <div id="banner" role="status" aria-live="polite"></div>
+  <div class="tools">
+    <input type="search" id="q" placeholder="題名で探す" aria-label="題名で探す">
+    <select id="sort" aria-label="並び順"><option value="new">新しい順</option><option value="old">古い順</option><option value="short">短い順</option><option value="long">長い順</option></select>
+    <label class="sw"><input type="checkbox" id="hideDup" checked>重複を隠す</label>
+    <span class="count" id="count"></span>
+  </div>
+  <ul id="list" aria-label="要約待ちの一覧"></ul>
+  <details id="logWrap"><summary>経過</summary><ol id="log"></ol></details>
+</main>
+<div id="bar" hidden><div class="in">
+  <div class="overall" id="overall" hidden><i id="overallFill"></i></div>
+  <div class="sum"><span><b id="selN">0</b> 件を選択</span><span id="selChars">0字</span><span id="selEta"></span><span id="selWarn"></span></div>
+  <div class="meter" id="meter" aria-hidden="true"><i id="meterFill"></i></div>
+  <div class="btns">
+    <button class="btn" id="selAll" type="button">すべて選ぶ</button>
+    <button class="btn" id="selNone" type="button">解除</button>
+    <button class="btn" id="stop" type="button" hidden>止める</button>
+    <button class="btn primary" id="go" type="button" disabled>選んだものを要約する</button>
+  </div>
+</div></div>
+
+<script>
+(() => {
+  "use strict";
+  const SERVER = "Notion", DS = "collection://3630e7a5-35dc-81e3-ad5b-000b1b10ef6d";
+  const T = { q: "notion-query-data-sources", f: "notion-fetch", u: "notion-update-page" };
+  const SOFT_LIMIT = 60000, MAX_PROMPT = 60000;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const hm = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()); };
+  const num = n => Number(n || 0).toLocaleString("ja-JP");
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  const S = { items: [], sel: new Set(), running: false, stop: false, abort: null, demo: false, q: "", sort: "new", hideDup: true, fatal: "", verified: false, doneCount: 0, runTotal: 0 };
+  let mcp = null, sample = null;
+
+  /* ---------- 経過 ---------- */
+  function log(text, err) { const li = document.createElement("li"); if (err) li.className = "err"; li.innerHTML = `<time>${hm()}</time><span></span>`; li.lastChild.textContent = text; $("#log").appendChild(li); $("#log").scrollTop = 1e9; }
+  function banner(html, kind, actions) {
+    const b = $("#banner"); b.innerHTML = html ? `<div class="note ${kind || ""}">${html}${actions ? `<div class="act">${actions}</div>` : ""}</div>` : "";
+  }
+
+  /* ---------- 重複(同じ動画) ---------- */
+  const ytId = u => { const m = String(u || "").match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : ""; };
+  const dupKey = u => { const id = ytId(u); if (id) return "yt:" + id; const s = String(u || "").trim(); if (!s) return ""; try { const o = new URL(s); o.hash = ""; [...o.searchParams.keys()].forEach(k => { if (/^(utm_|fbclid|gclid)/i.test(k)) o.searchParams.delete(k); }); return (o.origin + o.pathname.replace(/\/$/, "") + o.search).toLowerCase(); } catch { return s.toLowerCase(); } };
+
+  /* ---------- Notion からの値 ---------- */
+  function firstJson(str) {
+    const i = str.indexOf("{"); if (i < 0) return null;
+    let depth = 0, inStr = false, esc2 = false;
+    for (let k = i; k < str.length; k++) {
+      const c = str[k];
+      if (inStr) { if (esc2) esc2 = false; else if (c === "\\") esc2 = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true; else if (c === "{") depth++; else if (c === "}") { depth--; if (depth === 0) { try { return JSON.parse(str.slice(i, k + 1)); } catch { return null; } } }
+    }
+    return null;
+  }
+  function dataOf(res) {
+    let p = res && (res.structuredContent ?? res.payload);
+    if (p == null && res && Array.isArray(res.content)) p = res.content.map(c => c.text || "").join("\n");
+    if (typeof p === "string") { try { p = JSON.parse(p); } catch { p = firstJson(p) ?? p; } }
+    return p;
+  }
+  function textsOf(x, out = []) { if (typeof x === "string") out.push(x); else if (Array.isArray(x)) x.forEach(v => textsOf(v, out)); else if (x && typeof x === "object") Object.values(x).forEach(v => textsOf(v, out)); return out; }
+  async function call(tool, input, opts) { return mcp.callTool(SERVER, tool, input, opts); }
+  async function query(sql) { const d = dataOf(await call(T.q, { data: { data_source_urls: [DS], mode: "sql", query: sql } })); return Array.isArray(d?.results) ? d.results : []; }
+  const idOf = url => (String(url).match(/([0-9a-f]{32})(?:[?#].*)?$/i) || [, String(url)])[1];
+
+  /* ---------- 一覧を取る ---------- */
+  const Q_LIST = `SELECT url, "userDefined:URL" AS vurl, "動画タイトル" AS title, substr(createdTime,1,10) AS d, "原文文字数" AS chars FROM "${DS}" WHERE "状態" = '完了' ORDER BY createdTime DESC LIMIT 300`;
+  const Q_DONE = `SELECT "userDefined:URL" AS vurl FROM "${DS}" WHERE "状態" = '要約済み' AND "userDefined:URL" IS NOT NULL LIMIT 2000`;
+  function markDups(items, doneKeys) {
+    const g = new Map();
+    items.forEach(x => { x.dup = ""; const k = dupKey(x.vurl); x.key = k; if (k) (g.get(k) || g.set(k, []).get(k)).push(x); });
+    for (const list of g.values()) { list.sort((a, b) => (a.d || "").localeCompare(b.d || "")); list.slice(1).forEach(x => { x.dup = "同じ動画が、ほかにもあります（古い方を残します）"; }); }
+    items.forEach(x => { if (!x.dup && x.key && doneKeys.has(x.key)) x.dup = "すでに要約済みの動画と同じです"; });
+  }
+  async function load() {
+    S.fatal = ""; banner("Notion から、要約待ちを取っています…", "");
+    $("#reload").disabled = true;
+    try {
+      const rows = S.demo ? demoRows() : await query(Q_LIST);
+      let doneKeys = new Set();
+      if (!S.demo) { try { (await query(Q_DONE)).forEach(r => { const k = dupKey(r.vurl); if (k) doneKeys.add(k); }); } catch (e) { log("要約済みとの重複の確認は、できませんでした（" + (e.code || e.message) + "）。", true); } }
+      const old = new Map(S.items.map(x => [x.url, x]));
+      S.items = rows.map(r => Object.assign({ url: r.url, id: idOf(r.url), vurl: r.vurl || "", title: r.title || "（題名なし）", d: r.d || "", chars: Number(r.chars) || 0, st: "idle", stage: "", result: null }, (old.get(r.url) && old.get(r.url).st === "ok") ? { st: "ok", result: old.get(r.url).result } : {}));
+      markDups(S.items, doneKeys);
+      S.sel = new Set([...S.sel].filter(id => S.items.some(x => x.id === id && !x.dup && x.st !== "ok")));
+      const dups = S.items.filter(x => x.dup).length;
+      banner(S.demo ? `<b>デモ表示です。</b>Claude.ai でこのページを開くと、あなたの Notion の要約待ちが出ます（ここの題名は見本で、実在しません）。` : (S.items.length ? `要約待ちは <b>${num(S.items.length - dups)}</b> 件です${dups ? `（重複 ${num(dups)} 件は、要約しません。ClipStock の変換管理で削除できます）` : ""}。` : "要約待ちは、ありません。"), S.items.length ? "" : "ok");
+      log(`要約待ち ${S.items.length} 件を取りました。`);
+    } catch (e) { fail(e, "一覧を取る"); }
+    $("#reload").disabled = false; render();
+  }
+
+  /* ---------- エラー ---------- */
+  const FATAL = new Set(["needs_reauth", "server_not_connected", "selection_required", "approval_required", "not_in_manifest", "blocked_by_policy", "consent_required", "not_granted", "capability_disabled", "capability_removed", "user_changed"]);
+  function fail(e, what) {
+    const c = e && e.code;
+    const retry = `<button class="btn" type="button" data-act="retry">もう一度試す</button>`;
+    let msg;
+    if (c === "server_not_connected" || c === "server_not_found") msg = `<b>Notion が、Claude.ai につながっていません。</b>Claude.ai の「設定 → コネクタ」で Notion を追加してから、開き直してください。`;
+    else if (c === "needs_reauth") msg = `<b>Notion の接続が切れています。</b>Claude.ai の「設定 → コネクタ」で、Notion を再接続してください。`;
+    else if (c === "selection_required") msg = `<b>Notion のコネクタが複数あります。</b>どれを使うか選ぶ画面が出ていないときは、ページを開き直してください。`;
+    else if (c === "approval_required" || c === "not_in_manifest" || c === "consent_required" || c === "not_granted") msg = `<b>${esc(what)}には、許可が必要です。</b>Claude.ai の確認で「許可」を選んでから、もう一度試してください。`;
+    else if (c === "blocked_by_policy") msg = `<b>組織の設定で、このコネクタの操作が止められています。</b>`;
+    else if (c === "rate_limited") msg = `<b>呼び出しが多すぎます。</b>少し待ってから、もう一度試してください。`;
+    else if (c === "server_unavailable" || c === "upstream_error") msg = `<b>Notion につながりませんでした（${esc(what)}）。</b>少し待って、もう一度試してください。`;
+    else msg = `<b>${esc(what)}に失敗しました。</b>${esc(e && e.message || String(e))}`;
+    if (FATAL.has(c)) S.fatal = c;
+    banner(msg, "err", retry);
+    log(`${what}：${c || ""} ${e && e.message || ""}`.trim(), true);
+  }
+
+  /* ---------- 表示 ---------- */
+  const sortFn = { new: (a, b) => (b.d || "").localeCompare(a.d || ""), old: (a, b) => (a.d || "").localeCompare(b.d || ""), short: (a, b) => a.chars - b.chars, long: (a, b) => b.chars - a.chars };
+  const shown = () => { const q = S.q.trim().toLowerCase(); return S.items.filter(x => (!S.hideDup || !x.dup) && (!q || x.title.toLowerCase().includes(q))).sort(sortFn[S.sort]); };
+  const CHIP = { idle: ["待機中", ""], run: ["要約中", "run"], ok: ["要約済み", "ok"], ng: ["失敗", "ng"] };
+  function rowHtml(x) {
+    const [lab, cls] = x.dup ? ["重複", "ng"] : CHIP[x.st];
+    const dis = x.dup || x.st === "ok" || S.running ? "disabled" : "";
+    const md = x.d ? x.d.slice(5).replace("-", "/") : "";
+    return `<li class="row${S.sel.has(x.id) ? " sel" : ""}${x.dup ? " dup" : ""}" data-id="${esc(x.id)}">
+      <label class="chk"><input type="checkbox" data-id="${esc(x.id)}" ${S.sel.has(x.id) ? "checked" : ""} ${dis} aria-label="${esc(x.title)} を選ぶ"></label>
+      <div><div class="t">${esc(x.title)}</div>
+        <div class="m">${esc(md)}${md ? " ・ " : ""}${x.chars ? num(x.chars) + "字" : "字数は未取得"}${x.chars > 30000 ? '<span class="tag long">長い</span>' : ""}${x.dup ? `<span class="tag dup">重複</span>` : ""}</div>
+        ${x.dup ? `<div class="m">${esc(x.dup)}</div>` : ""}
+        <div class="stage${x.st === "ng" ? " ng" : ""}" role="status">${esc(x.stage)}</div>
+        ${x.result ? `<details class="res"><summary>要約の内容を見る</summary><div class="resbody">${esc(x.result.summary)}\n\n${esc(x.result.fields)}</div></details>` : ""}</div>
+      <div class="side"><span class="chip ${cls}">${lab}</span>${S.demo ? "" : `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">Notion</a>`}</div></li>`;
+  }
+  function render() {
+    const rows = shown();
+    $("#list").innerHTML = rows.map(rowHtml).join("") || `<li class="empty">${S.items.length ? "この条件の動画はありません。" : "まだ一覧がありません。"}</li>`;
+    const dups = S.items.filter(x => x.dup).length;
+    $("#count").textContent = S.items.length ? `${num(rows.length)} 件を表示${dups && S.hideDup ? `（重複 ${num(dups)} 件は隠しています）` : ""}` : "";
+    $("#bar").hidden = !S.items.length;
+    renderBar();
+  }
+  function renderBar() {
+    const sel = S.items.filter(x => S.sel.has(x.id)), chars = sel.reduce((a, x) => a + (x.chars || 0), 0);
+    $("#selN").textContent = sel.length; $("#selChars").textContent = num(chars) + "字";
+    $("#selEta").textContent = sel.length ? "（目安：約" + Math.max(1, Math.ceil(sel.length * 0.8 + chars / 25000)) + "分）" : "";
+    const over = chars > SOFT_LIMIT;
+    $("#meterFill").style.width = Math.min(100, chars / SOFT_LIMIT * 100) + "%"; $("#meter").classList.toggle("over", over);
+    $("#selWarn").textContent = over ? "多めです。時間と、Claude の利用量がかかります。" : "";
+    $("#go").disabled = !sel.length || S.running || !!S.fatal && S.fatal !== "";
+    $("#go").textContent = S.running ? "要約しています…" : (sel.length ? `選んだ ${sel.length} 件を要約する` : "選んだものを要約する");
+    $("#selAll").disabled = S.running; $("#selNone").disabled = S.running || !sel.length;
+    $("#stop").hidden = !S.running;
+    $("#overall").hidden = !S.running; $("#overallFill").style.width = S.runTotal ? (S.doneCount / S.runTotal * 100) + "%" : "0";
+  }
+  function setItem(x, st, stage, extra) { x.st = st; x.stage = stage || ""; Object.assign(x, extra || {}); render(); }
+
+  /* ---------- 要約(Claude)と書き込み(Notion) ---------- */
+  const TC = /\\?\[((?:\d{1,2}:)?\d{1,3}:\d{2})\\?\]\s*(.*)$/;
+  function transcriptOf(res) {
+    const lines = []; const seen = new Set();
+    for (const t of textsOf(dataOf(res))) for (const raw of t.split("\n")) { const m = raw.match(TC); if (m && m[2].trim()) { const l = `[${m[1]}] ${m[2].trim()}`; if (!seen.has(l)) { seen.add(l); lines.push(l); } } }
+    return lines;
+  }
+  const SPEC = `あなたは、動画の文字起こしを、ClipStock（個人の知識アプリ）の形式に要約する担当です。次の5項目を、JSON だけで返してください（前置き・コードブロックは不要）。
+キーは summary, mindmap, fields, apply, ideas。値はすべて文字列で、改行は \\n です。
+
+共通のルール：
+- 文字起こしに書かれていないことを足さない。音声認識の誤変換は、文脈から直してよい。
+- 時刻は、文字起こしの行頭にある [m:ss] のうち、実在するものだけを使う。形式は [0:37] [12:05] [1:02:03]。推測しない。
+- マーカーのタグ（<m1> など）は書かない。
+
+summary：5〜8文。何の話か、結論、押さえる点を、元を見なくても掴めるように。箇条書きにしない。
+
+mindmap：マークダウン。
+# 主題
+## 大項目 [0:30]
+- 小項目 [1:05]
+  - さらに細かい項目 [1:20]
+大項目4〜7、各2〜5、深さは最大3。ラベルは短く（20字ほど）。末尾の時刻は、その内容が始まる箇所。特定できなければ時刻は付けない。
+
+fields（分野別要約）：
+## 分野名 [0:30]
+その分野の要点を1〜2文
+- 具体的な事実・数値・手順を1行で [1:05]
+分野は2〜5。各分野の箇条書きは2〜5件。見出しの時刻は、その分野が最初に出る時刻。
+
+apply（応用）：
+## 応用案の題
+どう使うか1〜2文
+- 最初の一歩
+- 次の一歩
+2〜4件。明日から試せる具体性で。
+
+ideas（活用アイデア）：
+## アイデアの題
+面白い・意外な使い方を1〜2文
+3〜5件。応用と重複させない。`;
+  function promptOf(title, lines) {
+    let used = 0; const keep = [];
+    for (const l of lines) { if (used + l.length > MAX_PROMPT) break; keep.push(l); used += l.length + 1; }
+    return `${SPEC}\n\n題名：${title}\n文字起こし${keep.length < lines.length ? `（長いので、先頭の ${keep.length}/${lines.length} 行）` : ""}：\n${keep.join("\n")}`;
+  }
+  function cleanTimes(text, allowed) { return String(text).replace(/ ?\[((?:\d{1,2}:)?\d{1,3}:\d{2})\]/g, (m, t) => allowed.has(t) ? m : ""); }
+  function validate(o) {
+    if (!o || typeof o !== "object") return "JSON ではありません";
+    for (const k of ["summary", "mindmap", "fields", "apply", "ideas"]) if (typeof o[k] !== "string" || !o[k].trim()) return k + " が空です";
+    if (o.summary.trim().length < 60) return "summary が短すぎます";
+    if (!/^#/.test(o.mindmap.trim())) return "mindmap の形が違います";
+    if (!/^##/m.test(o.fields) || !/^##/m.test(o.apply) || !/^##/m.test(o.ideas)) return "見出し（##）がありません";
+    return "";
+  }
+  async function summarize(x, lines) {
+    const allowed = new Set(lines.map(l => l.slice(1, l.indexOf("]"))));
+    let lastErr = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      S.abort = new AbortController();
+      let o;
+      try { o = await sample.json(promptOf(x.title, lines) + (attempt ? `\n\n前回は「${lastErr}」でした。形式を守って、JSON だけを返してください。` : ""), { modelTier: "default", signal: S.abort.signal, cache: false }); }
+      catch (e) { if (e && e.code === "rate_limited") { await sleep(e.retryAfterMs || 5000); continue; } throw e; }
+      finally { S.abort = null; }
+      lastErr = validate(o);
+      if (!lastErr) { for (const k of ["mindmap", "fields"]) o[k] = cleanTimes(o[k], allowed); return o; }
+    }
+    throw Object.assign(new Error("要約の形が整いませんでした（" + lastErr + "）"), { code: "bad_format" });
+  }
+  const norm = s => String(s).replace(/\\[nrt"\\\/]/g, "").replace(/[^\p{L}\p{N}]/gu, "");   // JSON のエスケープと記号を除いて、文字だけで比べる
+  const VKEYS = ["要約", "マインドマップ", "分野別要約", "応用", "活用アイデア"];
+  const normV = s => String(s).replace(/<br\s*\/?>/gi, "").replace(/\\[nrt]/g, "").replace(/[^\p{L}\p{N}]/gu, "");   // 読み直しの表示では、改行が <br /> に、# や [ に \ が付く
+  async function verifyWritten(x, props) {
+    try {   // いちばん確か: Notion の保存値を SQL で直接読み、字数と末尾24字を比べる（表示の変換に左右されない）
+      const sel = VKEYS.map((k, i) => `length("${k}") AS l${i}, substr("${k}", -24) AS t${i}`).join(", ");
+      const rows = await query(`SELECT ${sel} FROM "${DS}" WHERE url = '${String(x.url).replace(/'/g, "''")}'`);
+      if (rows.length === 1) return VKEYS.filter((k, i) => Number(rows[0]["l" + i]) !== [...props[k]].length || String(rows[0]["t" + i] ?? "") !== [...props[k]].slice(-24).join(""));
+    } catch (e) { if (e && FATAL.has(e.code)) throw e; }
+    const back = normV(textsOf(dataOf(await call(T.f, { id: x.url }))).join("\n"));   // SQL が使えないとき: ページを読み直して、末尾が入っているか見る
+    return VKEYS.filter(k => !back.includes(normV(props[k]).slice(-24)));
+  }
+  async function writeAndVerify(x, o, nChars) {
+    const props = { "要約": o.summary.trim(), "マインドマップ": o.mindmap.trim(), "分野別要約": o.fields.trim(), "応用": o.apply.trim(), "活用アイデア": o.ideas.trim(),
+      "要約モデル": "Claude (アーティファクト)", "date:要約日時:start": new Date().toISOString(), "date:要約日時:is_datetime": 1 };
+    if (!x.chars && nChars) props["原文文字数"] = nChars;
+    setItem(x, "run", "Notion に書き込んでいます…");
+    await call(T.u, { command: "update_properties", page_id: x.url, properties: props, allow_async: false });
+    setItem(x, "run", "最後まで保存されたか、確認しています…");
+    const missing = await verifyWritten(x, props);
+    if (missing.length) throw Object.assign(new Error("「" + missing.join("」「") + "」を、Notion で最後まで確認できませんでした（保存が途中で切れたか、Notion の表示が省略されている可能性）。Notion で確かめてください。状態は「完了」のままにしました。"), { code: "truncated" });
+    setItem(x, "run", "状態を「要約済み」にしています…");
+    await call(T.u, { command: "update_properties", page_id: x.url, properties: { "状態": "要約済み" }, allow_async: false });
+  }
+  async function runOne(x) {
+    setItem(x, "run", "文字起こしを読んでいます…");
+    const lines = transcriptOf(await call(T.f, { id: x.url }));
+    const chars = lines.reduce((a, l) => a + l.length, 0);
+    if (chars < 200) throw Object.assign(new Error("文字起こしがありません（または短すぎます）。"), { code: "no_transcript" });
+    setItem(x, "run", `Claude が要約しています…（${num(chars)}字）`);
+    const o = await summarize(x, lines);
+    await writeAndVerify(x, o, chars);
+    setItem(x, "ok", "", { result: o });
+  }
+  async function run() {
+    const targets = S.items.filter(x => S.sel.has(x.id) && !x.dup && x.st !== "ok");
+    if (!targets.length || S.running) return;
+    S.running = true; S.stop = false; S.doneCount = 0; S.runTotal = targets.length; banner(`<b>${targets.length} 件を要約します。</b>このページを開いたままにしてください。`, ""); render();
+    let ok = 0, ng = 0;
+    for (const x of targets) {
+      if (S.stop) break;
+      try { await runOne(x); ok++; log(`「${x.title.slice(0, 28)}」を要約済みにしました。`); }
+      catch (e) {
+        ng++; const c = e && e.code;
+        setItem(x, "ng", c === "cancelled" ? "止めました。" : (e && e.message) || String(e));
+        log(`「${x.title.slice(0, 28)}」：${c || ""} ${(e && e.message) || ""}`.trim(), true);
+        if (FATAL.has(c)) { fail(e, "要約"); break; }
+        if (c === "server_unavailable" || c === "upstream_error") { log("書き込みの結果が分かりません。Notion でこの動画を確かめてから、やり直してください。", true); break; }
+      }
+      S.doneCount++; renderBar();
+    }
+    S.running = false; S.sel = new Set([...S.sel].filter(id => S.items.find(x => x.id === id && x.st !== "ok")));
+    if (!S.fatal) banner(`<b>${ok} 件を要約済みにしました。</b>${ng ? `失敗は ${ng} 件です（各行に理由を出しています）。` : ""}ClipStock には、次の書き出し（Mac の clipstock_export.py）のあと、「↻ 更新」で並びます。`, ng ? "err" : "ok", `<button class="btn" type="button" data-act="reload">残りの要約待ちを取り直す</button>`);
+    render();
+  }
+
+  /* ---------- デモ(Claude.ai の外で開いたとき。実在しない見本) ---------- */
+  const demoRows = () => [
+    ["デモ：新しい仕事の進め方を3つに絞る", "2026-11-07", 18420], ["デモ：会議を半分の時間にする工夫", "2026-11-07", 7210], ["デモ：入門者が最初に揃える道具", "2026-11-06", 41230],
+    ["デモ：数字の読み方の基本（前編）", "2026-11-04", 12980], ["デモ：数字の読み方の基本（前編）", "2026-11-04", 12980], ["デモ：朝の30分で学ぶ習慣", "2026-11-03", 5530],
+  ].map(([title, d, chars], i) => ({ url: "https://example.invalid/demo" + String(i).padStart(32, "0"), vurl: "https://www.youtube.com/watch?v=" + String.fromCharCode(66 + [0, 1, 2, 3, 3, 5][i]).repeat(11), title, d, chars }));
+  async function demoRun() {
+    const targets = S.items.filter(x => S.sel.has(x.id) && !x.dup && x.st !== "ok");
+    S.running = true; S.runTotal = targets.length; S.doneCount = 0; render();
+    for (const x of targets) {
+      if (S.stop) break;
+      for (const s of ["文字起こしを読んでいます…", `Claude が要約しています…（${num(x.chars)}字）`, "Notion に書き込んでいます…", "最後まで保存されたか、確認しています…"]) { setItem(x, "run", s); await sleep(600); }
+      setItem(x, "ok", "", { result: { summary: "（デモ）ここに、5〜8文のサマリが入ります。", fields: "## 分野名 [0:30]\n（デモ）ここに、分野別の要点が入ります。" } }); S.doneCount++; renderBar();
+    }
+    S.running = false; S.sel.clear(); banner("<b>デモの要約が終わりました。</b>実際の画面では、ここまでの内容が Notion に書き込まれます。", "ok"); render();
+  }
+
+  /* ---------- 操作 ---------- */
+  $("#list").addEventListener("change", e => {
+    const c = e.target.closest("input[type=checkbox][data-id]"); if (!c) return;
+    c.checked ? S.sel.add(c.dataset.id) : S.sel.delete(c.dataset.id); c.closest(".row").classList.toggle("sel", c.checked); renderBar();
+  });
+  $("#q").addEventListener("input", e => { S.q = e.target.value; render(); });
+  $("#sort").addEventListener("change", e => { S.sort = e.target.value; render(); });
+  $("#hideDup").addEventListener("change", e => { S.hideDup = e.target.checked; render(); });
+  $("#selAll").addEventListener("click", () => { shown().filter(x => !x.dup && x.st !== "ok").forEach(x => S.sel.add(x.id)); render(); });
+  $("#selNone").addEventListener("click", () => { S.sel.clear(); render(); });
+  $("#go").addEventListener("click", () => S.demo ? demoRun() : run());
+  $("#stop").addEventListener("click", () => { S.stop = true; if (S.abort) S.abort.abort(); $("#stop").disabled = true; log("止めます（いま作っている1件は、終わるまで待ちます）。"); });
+  $("#reload").addEventListener("click", () => { if (!S.running) load(); });
+  $("#banner").addEventListener("click", e => { const a = e.target.closest("[data-act]"); if (!a) return; S.fatal = ""; load(); });
+
+  /* ---------- 起動 ---------- */
+  (async () => {
+    try { mcp = window.claude ? await window.claude.use("mcp") : null; sample = window.claude ? await window.claude.use("sample") : null; } catch { mcp = sample = null; }
+    if (!mcp || !sample) { S.demo = true; log("Claude.ai の外で開かれているため、デモ表示にします。"); }
+    await load();
+  })();
+  window.__clipstock = { S, run, load };   // 動作確認用
+})();
+</script>
+</body>
+</html>

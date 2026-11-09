@@ -1,7 +1,7 @@
 // ClipStock のサービスワーカー：画面一式と、GitHub から取った暗号化済みのデータを端末に置く
 // 一覧・ノート・夜間処理は index.html 側で「保存分を先に出して裏で更新」している。ここでは本文とサムネを担当。
-const SHELL = "clipstock-shell-v1", DATA = "clipstock-data", FONTS = "clipstock-fonts";
-const SHELL_FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const SHELL = "clipstock-shell-v2", DATA = "clipstock-data", FONTS = "clipstock-fonts";
+const SHELL_FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon.svg", "favicon.svg", "favicon.ico", "apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(SHELL_FILES).catch(() => {})).then(() => self.skipWaiting()));
