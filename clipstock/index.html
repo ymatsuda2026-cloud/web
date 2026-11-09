@@ -248,7 +248,7 @@ mark.hl.flash{outline:2px solid var(--foil); outline-offset:1px}
 .seltool{position:fixed; z-index:44; display:flex; gap:2px; background:#232838; color:#fff; border-radius:9px; padding:4px; box-shadow:0 8px 22px rgba(0,0,0,.3)}
 .seltool button{border:0; background:none; color:#fff; padding:7px 10px; border-radius:6px; font-size:13px; white-space:nowrap; display:flex; align-items:center}
 .seltool button:hover{background:rgba(255,255,255,.12)}
-.nq{font-family:var(--serif); font-size:14px; line-height:1.7; background:var(--sheet); border-left:3px solid var(--foil); padding:6px 10px; margin:0; max-height:9em; overflow:auto}
+.nq{white-space:pre-wrap; font-family:var(--serif); font-size:14px; line-height:1.7; background:var(--sheet); border-left:3px solid var(--foil); padding:6px 10px; margin:0; max-height:9em; overflow:auto}
 .chips{display:flex; flex-wrap:wrap; gap:5px}
 .chip{border:1px solid var(--line); background:var(--sheet); color:var(--muted); border-radius:14px; min-height:26px; padding:0 10px; font-size:12px; display:inline-flex; align-items:center}
 .chip.on{border-color:var(--foil); color:var(--ink); background:var(--foil-soft)}
@@ -288,6 +288,7 @@ details.acc > summary .cnt{font-weight:400; color:var(--muted); font-size:12px}
 .tocb[disabled]{opacity:.45; cursor:default}
 .lnk{border:0; background:none; padding:4px 0; color:var(--foil-text); font-size:13px; text-decoration:underline; cursor:pointer}
 .nmini{border-left:4px solid var(--foil); background:var(--sheet); border-radius:6px; padding:7px 10px; margin:6px 0; cursor:pointer; font-size:13px; line-height:1.6}
+.nmini{white-space:pre-line}
 .nmini .nm{font-size:11.5px; color:var(--muted); margin-top:2px}
 .recline{font-size:12.5px; color:var(--muted); margin:2px 0 8px; line-height:1.8}
 .finb{display:inline-block; font-size:10.5px; color:#fff; background:var(--ok); border-radius:9px; padding:0 7px; margin-left:6px}
@@ -335,7 +336,6 @@ body:has(#bulkbar:not([hidden])) .toast{bottom:calc(76px + env(safe-area-inset-b
 .grid.wide.reading{grid-template-columns:minmax(0,1fr)}
 .grid.wide.reading #shelf{display:none}
 .grid.wide.reading #viewer{display:flex}
-.grid.wide.reading .back{display:inline-flex}
 /* スマホ: 読むときは、上の帯・題名・ボタンを隠し、画面を押すとスライドで出す(書庫と同じ) */
 body.imm{padding-bottom:0}
 body.imm::before{background:var(--desk)}
@@ -347,6 +347,26 @@ body.imm:not(.chrome) .vtop{transform:translateY(calc(-100% - var(--barh,0px) - 
 body.imm.chrome .bar, body.imm.chrome .vtop{box-shadow:0 6px 18px rgba(20,24,40,.2)}
 body.imm #viewer, body.imm .stage{background:var(--desk)}
 body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
+
+/* 下部のタブ(一覧・本文): スマホと、一覧を全画面にしたとき。書庫と同じ */
+.tabbar{display:none; background:var(--paper); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar button{flex:1; border:0; background:none; padding:11px 0; font-size:13.5px; color:var(--muted); cursor:pointer}
+.tabbar button.on{color:var(--ink); font-weight:600; box-shadow:inset 0 2px 0 var(--foil)}
+@media (max-width:820px){ .tabbar:not([hidden]){display:flex} }
+body:has(.grid.wide) .tabbar:not([hidden]){display:flex}
+body.full .tabbar{display:none !important}
+body.imm .tabbar{position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; transition:transform .25s ease}
+body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
+/* 状態(すべて・未読・読書中・読了・お気に入り)の絞り込み */
+.fbar{display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px; border-bottom:1px solid var(--line)}
+.fbar .chip{cursor:pointer}
+/* お気に入り */
+.thumb .fav{position:absolute; left:5px; bottom:4px; width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,.5); color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; line-height:1; cursor:pointer; z-index:2}
+.thumb .fav.on{color:#f3d36b}
+.selmode .thumb .fav{display:none}
+.sdet-actions{display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px}
+.stbtns{display:flex; flex-wrap:wrap; gap:6px}
+#favBtn[aria-pressed="true"]{color:var(--foil-text); border-color:var(--foil); background:var(--foil-soft)}
 
 @media (max-width:820px){
   #wideBtn{display:none}
@@ -369,9 +389,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
   .racts{justify-content:flex-start}
     .stage{padding:8px 8px 10px}
   .sheet{padding:14px 14px}
-  .back{display:inline-flex !important}
 }
-.back{display:none}
 </style>
 </head>
 <body>
@@ -446,6 +464,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
       <button class="tb" id="selBtn" aria-pressed="false" title="いくつか選んで、まとめてタグを付ける">選択</button>
       <button class="tb" id="wideBtn" aria-pressed="false" title="一覧を画面いっぱいにします。サムネイルを押すと、詳細も全画面で開きます">全画面</button>
     </div>
+    <div class="fbar" id="fbar" role="group" aria-label="状態で絞り込む"></div>
     <div class="list" id="list"></div>
     <div id="detail" hidden></div>
     <div id="bulkbar" hidden></div>
@@ -454,13 +473,13 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
   <article id="viewer" class="h">
     <div class="vtop" id="vtop">
     <div class="rtools" id="rtools">
-      <button class="tb back" id="backBtn">‹ 一覧へ</button>
       <div class="seg" id="wm" role="group" aria-label="組み方">
         <button data-wm="v">縦書き</button>
         <button data-wm="h" class="on">横書き</button>
       </div>
       <button class="tb" id="fsDown" aria-label="文字を小さく">A−</button>
       <button class="tb" id="fsUp" aria-label="文字を大きく">A＋</button>
+      <button class="tb" id="favBtn" aria-pressed="false" title="お気に入り">☆ お気に入り</button>
       <button class="tb" id="tocBtn" aria-haspopup="dialog">目次</button>
       <button class="tb" id="recBtn" aria-haspopup="dialog" title="この動画のマーカーとメモ">記録<span class="rc" id="recN"></span></button>
       <button class="tb" id="kindBtn" aria-haspopup="dialog" title="この動画の種別（1つだけ選べます）">種別</button>
@@ -475,6 +494,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     <div class="stage" id="stage"></div>
   </article>
 </main>
+<nav class="tabbar" id="tabbar" hidden aria-label="一覧と本文"><button type="button" data-m="list" class="on">一覧</button><button type="button" data-m="reader">本文</button></nav>
 
 <section class="panel" id="notes" hidden aria-label="ノート"></section>
 <section class="panel" id="stats" hidden aria-label="記録"></section>
@@ -585,7 +605,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     mode: "library", mfilter: "all", mq: "", sel: new Set(), run: {}, ovl: {}, bundles: new Map(), busy: false,
     vp: { w: 480, x: null, y: null }, vpId: "", prevSeen: 0
   };
-  S.dup = new Map(); S.tag = "all"; S.kind = "all"; S.selMode = false; S.tsel = new Set();
+  S.dup = new Map(); S.tag = "all"; S.kind = "all"; S.selMode = false; S.tsel = new Set(); S.sf = ls.get("clipstock.sf", "all");
   { const p = ls.get(PREFS, {}); for (const k of ["tile", "vert", "fs", "sort", "vp"]) if (p[k] !== undefined) S[k] = p[k]; }
   const savePrefs = () => ls.set(PREFS, { tile: S.tile, vert: S.vert, fs: S.fs, sort: S.sort, vp: S.vp });
   let toastTimer = 0;
@@ -768,28 +788,39 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     $("#kindlist").innerHTML = kindVocab().map(([k]) => `<option value="${esc(k)}"></option>`).join("");
     updateKindBtn(); drawTagMenu();
   }
-  function visible() {
+  /** 種別・タグ・検索で絞ったもの(状態の絞り込みの前)。状態のチップの件数は、これで数える */
+  function baseItems() {
     const q = S.q.trim().toLowerCase();
-    const a = S.items.filter(x => x.st === "要約済み" && !isDup(x) && (S.kind === "all" || kindOf(x) === S.kind.slice(2)) && tagOk(x)
+    return S.items.filter(x => x.st === "要約済み" && !isDup(x) && (S.kind === "all" || kindOf(x) === S.kind.slice(2)) && tagOk(x)
       && (!q || (x.t || "").toLowerCase().includes(q) || (x.s || "").toLowerCase().includes(q)));
+  }
+  const stateFilterOk = x => S.sf === "all" || (S.sf === "fav" ? !!RS.fav[x.id]?.v : stateOf(x.id) === S.sf);
+  function visible() {
+    const a = baseItems().filter(stateFilterOk);
     a.sort((p, r) => S.sort === "old" ? (p.c || "").localeCompare(r.c || "") : (r.c || "").localeCompare(p.c || ""));
     return a;
+  }
+  function drawFbar() {
+    const base = baseItems(), cnt = { all: base.length, unread: 0, reading: 0, done: 0, fav: 0 };
+    for (const x of base) { cnt[stateOf(x.id)]++; if (RS.fav[x.id]?.v) cnt.fav++; }
+    $("#fbar").innerHTML = [["all", "すべて"], ["unread", "未読"], ["reading", "読書中"], ["done", "読了"], ["fav", "★ お気に入り"]]
+      .map(([k, l]) => `<button type="button" class="chip${S.sf === k ? " on" : ""}" data-sf="${k}">${l} ${cnt[k]}</button>`).join("");
   }
   const TILE = { s: 92, m: 124, l: 172 };
   /* 新着(書庫と同じ考え方): 前回開いたあとに要約されて、まだ開いていないもの */
   const isNew = x => !!S.prevSeen && !RS.pos[x.id] && Date.parse(x.g || x.e || "") > S.prevSeen;
   function thumbBox(x, withChk) {
     // サムネイルがあるものは、背景に文字を入れない(読み込めなかったときだけ、題名を出す)
-    return `<span class="thumb" style="--h:${hashHue(x.t)}" data-tt="${esc(x.t)}" ${x.th ? `data-th="${x.id}"` : ""}>${x.th ? "" : `<span class="ph" aria-hidden="true"><b>${esc(x.t)}</b></span>`}${x.src === "web" ? '<span class="web">Web</span>' : ""}${isNew(x) ? '<span class="nb">新着</span>' : ""}${x.d ? `<span class="len">${dur(x.d)}</span>` : ""}${withChk ? '<span class="chk">✓</span>' : ""}</span>`;
+    return `<span class="thumb" style="--h:${hashHue(x.t)}" data-tt="${esc(x.t)}" ${x.th ? `data-th="${x.id}"` : ""}>${x.th ? "" : `<span class="ph" aria-hidden="true"><b>${esc(x.t)}</b></span>`}${x.src === "web" ? '<span class="web">Web</span>' : ""}${isNew(x) ? '<span class="nb">新着</span>' : ""}${x.d ? `<span class="len">${dur(x.d)}</span>` : ""}${withChk ? '<span class="chk">✓</span>' + favStar(x.id) : ""}</span>`;
   }
   function drawList() {
-    const rows = visible();
+    const rows = visible(); drawFbar();
     $("#count").textContent = `${rows.length} 件`;
     const list = $("#list");
     list.style.setProperty("--tile", Math.round(TILE[S.tile] * (S.wide ? 1.25 : 1)) + "px");
     list.style.setProperty("--tt", ({ s: 11.5, m: 12.5, l: 13.5 }[S.tile] + (S.wide ? 0.5 : 0)) + "px");
     list.classList.toggle("selmode", S.selMode);
-    list.innerHTML = rows.map(x => `<div class="cell"><button class="item${x.id === S.cur ? " on" : ""}${S.tsel.has(x.id) ? " sel" : ""}" data-id="${x.id}">${thumbBox(x, true)}<span class="it-title" title="${esc(x.t)}">${esc(x.t)}</span><span class="it-meta">${esc(kindOf(x))} ・ ${md(x.c)}${RS.fin[x.id]?.v ? " ・ 読了" : ""}</span></button><button class="more" data-gb="${x.id}">目次・記録 ›</button></div>`).join("")
+    list.innerHTML = rows.map(x => `<div class="cell"><button class="item${x.id === S.cur ? " on" : ""}${S.tsel.has(x.id) ? " sel" : ""}" data-id="${x.id}">${thumbBox(x, true)}<span class="it-title" title="${esc(x.t)}">${esc(x.t)}</span><span class="it-meta">${esc(kindOf(x))} ・ ${md(x.c)}${stLabel(x.id)}</span></button><button class="more" data-gb="${x.id}">目次・記録 ›</button></div>`).join("")
       || `<p class="empty" style="grid-column:1/-1">${S.items.length ? "条件に合う動画がありません。<br>要約していないものは「変換管理」から要約してください。" : "まだ書き出されたデータがありません。"}</p>`;
     hydrateThumbs(list);
   }
@@ -997,7 +1028,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
   function renderBundle(it, b, keep) {
     S.curBundle = b;
     $("#vhead").innerHTML = `<h1>${esc(b.title || it.t)}${isNew(it) ? '<span class="newb">新着</span>' : ""}${RS.fin[it.id]?.v ? '<span class="finb">読了</span>' : ""}</h1><div class="sub"><span>${esc(kindOf(it))} ・ ${md(it.c)}${it.d ? " ・ " + dur(it.d) : ""}${b.model ? " ・ " + esc(b.model) : ""}</span></div>`;
-    $("#openSrc").disabled = !b.url; updateKindBtn();
+    $("#openSrc").disabled = !b.url; updateKindBtn(); updateFavBtn();
     $("#openSrc").textContent = it.src === "web" ? "▶ 記事を開く" : "▶ 動画を開く";
     renderStage(keep);
   }
@@ -1037,8 +1068,9 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
       const b = await getBundle(id);
       if (S.cur !== id) return;
       renderBundle(it, b); startTrack(id);
-      RS.pos[id] = { at: Date.now(), view: S.view }; saveRS();            // 読んだ記録(続き・新着の判定)
+      RS.pos[id] = { at: Date.now(), view: S.view }; if (RS.stx[id]?.v === "unread") RS.stx[id] = { v: null, at: Date.now() }; saveRS();   // 開いたら読書中(「未読」を選んでいたときは、その選択を外す)            // 読んだ記録(続き・新着の判定)
       $$(`#list .item[data-id="${id}"] .nb`).forEach(e => e.remove());   // 開いたら「新着」を外す
+      if (S.sf === "all") { drawFbar(); const t = $(`#list .item[data-id="${id}"] .it-meta`); if (t) t.textContent = `${kindOf(it)} ・ ${md(it.c)}${stLabel(id)}`; } else drawList();   // 開いたら「読書中」: 件数と、サムネの下の表示を更新
       if (opts.sec && S.view === "main") $("#sec-" + opts.sec)?.scrollIntoView({ block: "start", inline: "nearest" });
     } catch (e) { if (S.cur === id) $("#stage").innerHTML = `<p class="empty">${esc(e.message)}</p>`; }
   }
@@ -1252,7 +1284,22 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     if (on) document.documentElement.style.setProperty("--barh", $("#bar").offsetHeight + "px");
     else { document.body.classList.remove("chrome"); clearTimeout(chromeT); }
   }
-  function setReading(on) { $("#app").classList.toggle("reading", !!on); updateImm(); }
+  function setReading(on) { $("#app").classList.toggle("reading", !!on); updateImm(); updateTabbar(); }
+  /* ---------- 下部のタブ(一覧・本文)。スマホと、一覧を全画面にしたときに出る ---------- */
+  function updateTabbar() {
+    const tb = $("#tabbar"); if (!tb) return;
+    tb.hidden = !(S.mode === "library" && !$("#app").hidden);
+    const rd = $("#app").classList.contains("reading");
+    tb.querySelectorAll("[data-m]").forEach(b => b.classList.toggle("on", (b.dataset.m === "reader") === rd));
+  }
+  async function setTab(m) {
+    if (m === "list") return setReading(false);
+    if (S.cur && S.curBundle) return setReading(true);
+    const last = ls.get(LAST, null), id = S.cur || (last && S.byId.has(last) ? last : visible()[0]?.id);   // まだ何も開いていないときは、前回の動画か、先頭の動画
+    if (!id) { toast("一覧から動画を選んでください。", 2200); return; }
+    await openItem(id);
+  }
+  $("#tabbar").addEventListener("click", e => { const b = e.target.closest("[data-m]"); if (b) setTab(b.dataset.m); });
   function setChrome(on) {                                  // スマホ: 上の帯・題名・ボタンを、スライドで出し入れする
     clearTimeout(chromeT); document.body.classList.toggle("chrome", !!on);
     if (!on) return;
@@ -1265,7 +1312,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     const s = getSelection(); if (s && !s.isCollapsed) return;
     setChrome(!document.body.classList.contains("chrome"));
   });
-  window.addEventListener("resize", updateImm);
+  window.addEventListener("resize", () => { updateImm(); updateTabbar(); });
   const PANELS = ["notes", "stats", "night", "manage"];
   function mode(m) {
     S.mode = m;
@@ -1277,7 +1324,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     if (m === "stats") drawStats();
     if (m === "night") { drawNight(); loadJson("night.json.age", (o) => { if (o) { S.night = o; if (S.mode === "night") drawNight(); } }).catch(e => { $("#night").innerHTML = `<h2>夜間処理</h2><p class="empty">${esc(e.code === 404 ? "まだ書き出されていません。" : e.message)}</p>`; }); }
     if (m === "manage") drawManage();
-    updateImm();
+    updateImm(); updateTabbar();
   }
   function showGate() {
     const has = !!vaultGet();
@@ -1315,9 +1362,9 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     }
   }
   function lock() {
-    vpClose(); hideSelTool(); hidePop(); setFull(false); closeDetail(); stopTrack(); document.body.classList.remove("imm", "chrome"); $("#app").classList.remove("reading", "wide"); S.wide = false; $("#wideBtn").textContent = "全画面";
+    vpClose(); hideSelTool(); hidePop(); setFull(false); closeDetail(); stopTrack(); document.body.classList.remove("imm", "chrome"); $("#app").classList.remove("reading", "wide"); S.wide = false; $("#wideBtn").textContent = "全画面"; $("#tabbar").hidden = true;
     flushRS(); persistNow(); clearInterval(pullTimer);        // 鍵を捨てる前に、記録を送り切る・暗号化して保存する
-    secret = null; K = null; dec = null; RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {} }; SY.sha = null; SY.dirty = false; S.view = "main";
+    secret = null; K = null; dec = null; RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {}, fav: {}, stx: {} }; SY.sha = null; SY.dirty = false; S.view = "main";
     thumbs.forEach(p => p.then(u => u && URL.revokeObjectURL(u))); thumbs.clear(); waiting.length = 0;
     S.items = []; S.byId = new Map(); S.at = ""; S.notes = null; S.night = null; S.cur = null; S.bundles.clear(); S.curBundle = null; S.sel.clear(); S.ovl = {}; S.dup = new Map(); S.tag = "all"; S.selMode = false; S.tsel.clear(); tagPending.clear(); $("#bulkbar").hidden = true; $("#selBtn").setAttribute("aria-pressed", "false"); $("#selBtn").textContent = "選択";
     $("#list").innerHTML = ""; $("#stage").innerHTML = ""; $("#vhead").innerHTML = ""; popClose(); showGate();
@@ -1429,14 +1476,14 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
 
   /* ---------- 読んだ記録・マーカー・メモ(書庫と同じ作り。暗号化して web-archive に同期) ---------- */
   const RSK = "clipstock.rstate", OPTK = "clipstock.opts", ACCK = "clipstock.acc", STATE_PATH = "clipstock-state.json.age";
-  let RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {} };
+  let RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {}, fav: {}, stx: {} };
   const O = Object.assign({ font: "shippori" }, ls.get(OPTK, {}));
   const ACC = Object.assign({ toc: true, notes: false, tags: true, kind: true }, ls.get(ACCK, {}));
   const SY = { sha: null, timer: 0, dirty: false, warned: false, busy: false };
   const SYNC_SOON = DEV.syncSoon ?? 3000, SYNC_LATER = DEV.syncLater ?? 90000;
   const urlFor = (sec, path) => `https://api.github.com/repos/${encodeURIComponent(sec.owner)}/${encodeURIComponent(sec.repo)}/contents/${path}`;
   const ghHeaders = sec => ({ Authorization: "Bearer " + sec.token, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" });
-  async function loadRS() { try { const v = ls.get(RSK, null); RS = Object.assign({ pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {} }, v ? await unsealWith(K, v) : {}); } catch { RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {} }; } }
+  async function loadRS() { try { const v = ls.get(RSK, null); RS = Object.assign({ pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {}, fav: {}, stx: {} }, v ? await unsealWith(K, v) : {}); } catch { RS = { pos: {}, fin: {}, notes: {}, tags: {}, gone: {}, kinds: {}, misc: {}, fav: {}, stx: {} }; } }
   let rsT = 0;
   const persistNow = () => K ? sealWith(K, RS).then(v => ls.set(RSK, v)).catch(() => {}) : Promise.resolve();
   function persistRS() { clearTimeout(rsT); rsT = setTimeout(persistNow, 300); }
@@ -1445,7 +1492,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
   }
   const newer = (a, b) => { const o = { ...(a || {}) }; for (const [k, v] of Object.entries(b || {})) if (!o[k] || (v?.at || 0) > (o[k]?.at || 0)) o[k] = v; return o; };
   function mergeRS(r) {
-    RS.pos = newer(RS.pos, r.pos); RS.fin = newer(RS.fin, r.fin); RS.tags = newer(RS.tags, r.tags); RS.gone = newer(RS.gone, r.gone); RS.kinds = newer(RS.kinds, r.kinds); RS.misc = newer(RS.misc, r.misc);
+    RS.pos = newer(RS.pos, r.pos); RS.fin = newer(RS.fin, r.fin); RS.tags = newer(RS.tags, r.tags); RS.gone = newer(RS.gone, r.gone); RS.kinds = newer(RS.kinds, r.kinds); RS.misc = newer(RS.misc, r.misc); RS.fav = newer(RS.fav, r.fav); RS.stx = newer(RS.stx, r.stx);
     const nn = { ...(RS.notes || {}) };
     for (const [id, m] of Object.entries(r.notes || {})) nn[id] = newer(nn[id], m);
     RS.notes = nn; persistRS();
@@ -1538,17 +1585,19 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
       mid.parentNode.insertBefore(m, mid); m.appendChild(mid);
     }
   }
+  // 1つのノートは、1か所(これまでの形)か、複数の対象(見出しの下の段落・箇条書きなど)にまたがる segs を持つ
+  const segsOf = n => n.segs && n.segs.length ? n.segs : [{ f: n.f, k: n.k, s: n.s, p: n.p, a: n.a, b: n.b, q: n.quote }];
   function renderMarks() {
     const root = $("#stage .flow"); if (!root) return;
     for (const m of root.querySelectorAll("mark.hl")) { const p = m.parentNode; while (m.firstChild) p.insertBefore(m.firstChild, m); m.remove(); p.normalize(); }
     updateRec();
     const b = S.curBundle; if (!b || S.view !== "main") return;
-    for (const n of liveNotes(S.cur)) {
-      const els = [...root.querySelectorAll(`[data-mf="${n.f}"][data-mk="${n.k}"]${n.s == null ? "" : `[data-ms="${n.s}"]`}${n.p == null ? "" : `[data-mp="${n.p}"]`}`)];
+    for (const n of liveNotes(S.cur)) for (const g of segsOf(n)) {
+      const els = [...root.querySelectorAll(`[data-mf="${g.f}"][data-mk="${g.k}"]${g.s == null ? "" : `[data-ms="${g.s}"]`}${g.p == null ? "" : `[data-mp="${g.p}"]`}`)];
       if (!els.length) continue;
-      const str = plainOf(getMarked(b[n.f], { kind: n.k, sec: n.s, point: n.p }));
-      let a = n.a, e = n.b;
-      if (cpSlice(str, a, e) !== n.quote) { const i = str.indexOf(n.quote); if (i < 0) continue; a = cpLen(str.slice(0, i)); e = a + cpLen(n.quote); }   // 文面が変わっていたら、同じ文を探し直す
+      const str = plainOf(getMarked(b[g.f], { kind: g.k, sec: g.s, point: g.p }));
+      let a = g.a, e = g.b;
+      if (cpSlice(str, a, e) !== g.q) { const i = str.indexOf(g.q); if (i < 0) continue; a = cpLen(str.slice(0, i)); e = a + cpLen(g.q); }   // 文面が変わっていたら、同じ文を探し直す
       const s = nodeAt(els, a, false), t = nodeAt(els, e, true); if (!s || !t) continue;
       const r = document.createRange(); r.setStart(s.node, s.off); r.setEnd(t.node, t.off);
       wrapRange(r, "c-" + (n.color || "y") + (n.text ? " memo" : ""), n.id);
@@ -1576,27 +1625,55 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     const segs = node.querySelectorAll("[data-s]");
     return segs.length ? segEnd(segs[segs.length - 1]) : (node.matches && node.matches("[data-s]") ? segEnd(node) : null);
   }
+  /** 選んだ範囲の文章を、行ごと(見出し・段落・箇条書き)に並べる。時刻のバッジは除く。コピー用 */
+  function copyTextOf(r, flow) {
+    const out = [];
+    for (const el of flow.querySelectorAll("h2, h3, p, li")) {
+      if (!r.intersectsNode(el)) continue;
+      const rr = document.createRange(); rr.selectNodeContents(el);
+      if (el.contains(r.startContainer)) rr.setStart(r.startContainer, r.startOffset);
+      if (el.contains(r.endContainer)) rr.setEnd(r.endContainer, r.endOffset);
+      const frag = rr.cloneContents(); frag.querySelectorAll(".ts").forEach(n => n.remove());
+      const t = frag.textContent.replace(/\s+/g, " ").trim();
+      if (t) out.push((el.tagName === "LI" ? "・" : "") + t);
+    }
+    return out.join("\n");
+  }
+  /** 選んだ範囲を、(1) マーカーを引ける対象ごとの位置(複数の行・段落・箇条書きにまたがってよい)と、(2) コピー用の文章 にする */
   function selectionInfo() {
     const sel = getSelection(); if (!sel || !sel.rangeCount || sel.isCollapsed) return null;
     const r = sel.getRangeAt(0), flow = document.querySelector("#stage .flow"), b = S.curBundle;
     if (!flow || !b || S.view !== "main" || !r.intersectsNode(flow)) return null;
-    const els = [...flow.querySelectorAll("[data-mk]")].filter(el => r.intersectsNode(el));
-    if (!els.length) return null;
-    const first = els[0], last = els.filter(el => sameT(first, el)).pop(), addr = addrOfEl(first);
-    const marked = getMarked(b[addr.field], addr), cps = [...plainOf(marked)], n = cps.length;
-    let s = first.contains(r.startContainer) ? posOf(r.startContainer, r.startOffset, false, first) : 0;
-    let e = last.contains(r.endContainer) ? posOf(r.endContainer, r.endOffset, true, last) : n;
-    if (s === null) s = n; if (e === null) e = n;
-    s = Math.max(0, Math.min(s, n)); e = Math.max(0, Math.min(e, n));
-    while (s < e && /\s/.test(cps[s])) s++;
-    while (e > s && /\s/.test(cps[e - 1])) e--;
-    if (e - s < 1) return null;
-    const q = (r.getBoundingClientRect ? r.getBoundingClientRect() : first.getBoundingClientRect());
-    return { addr, s, e, text: cps.slice(s, e).join(""), rect: { left: q.left, right: q.right, top: q.top, bottom: q.bottom, width: q.width } };
+    const groups = [];                                         // 同じ対象の行(複数行の段落)は、1つにまとめる
+    for (const el of flow.querySelectorAll("[data-mk]")) {
+      if (!r.intersectsNode(el)) continue;
+      const lastG = groups[groups.length - 1];
+      if (lastG && sameT(lastG[0], el)) lastG.push(el); else groups.push([el]);
+    }
+    const segs = [];
+    for (const g of groups) {
+      const addr = addrOfEl(g[0]), cps = [...plainOf(getMarked(b[addr.field], addr))], n = cps.length;
+      const mts = g.flatMap(el => [...el.querySelectorAll(".mt[data-s]")]); if (!mts.length) continue;
+      const s0 = Math.min(...mts.map(m => +m.dataset.s)), e0 = Math.max(...mts.map(m => +m.dataset.s + cpLen(m.textContent)));
+      let s = s0, e = e0;                                      // 範囲の端がこの対象の中なら、そこから/そこまで。外なら、対象の全体(時刻のバッジは除く)
+      const sEl = g.find(el => el.contains(r.startContainer)), eEl = g.find(el => el.contains(r.endContainer));
+      if (sEl) { const v = posOf(r.startContainer, r.startOffset, false, sEl); s = v === null ? e0 : Math.max(s0, v); }
+      if (eEl) { const v = posOf(r.endContainer, r.endOffset, true, eEl); e = v === null ? e0 : Math.min(e0, v); }
+      s = Math.max(0, Math.min(s, n)); e = Math.max(0, Math.min(e, n));
+      while (s < e && /\s/.test(cps[s])) s++;
+      while (e > s && /\s/.test(cps[e - 1])) e--;
+      if (e - s >= 1) segs.push({ addr, s, e, q: cps.slice(s, e).join("") });
+    }
+    const copy = copyTextOf(r, flow);
+    if (!segs.length && !copy) return null;
+    const q = (r.getBoundingClientRect ? r.getBoundingClientRect() : flow.getBoundingClientRect());
+    return { segs, addr: segs[0]?.addr, s: segs[0]?.s, e: segs[0]?.e, text: segs.map(g => g.q).join("\n"), copy, rect: { left: q.left, right: q.right, top: q.top, bottom: q.bottom, width: q.width } };
   }
   function addNote(info, color, text) {
-    const iid = S.cur, id = nid();
-    (RS.notes[iid] = RS.notes[iid] || {})[id] = { id, f: info.addr.field, k: info.addr.kind, s: info.addr.sec, p: info.addr.point, a: info.s, b: info.e, quote: info.text, color, text: text || "", at: Date.now() };
+    const iid = S.cur, id = nid(), g0 = info.segs[0];
+    const note = { id, f: g0.addr.field, k: g0.addr.kind, s: g0.addr.sec, p: g0.addr.point, a: g0.s, b: g0.e, quote: info.text, color, text: text || "", at: Date.now() };
+    if (info.segs.length > 1) note.segs = info.segs.map(g => ({ f: g.addr.field, k: g.addr.kind, s: g.addr.sec, p: g.addr.point, a: g.s, b: g.e, q: g.q }));   // 古い版は、先頭の1か所だけを表示する
+    (RS.notes[iid] = RS.notes[iid] || {})[id] = note;
     saveRS(true); const sel = getSelection(); if (sel) sel.removeAllRanges(); hideSelTool(); renderMarks();
     return id;
   }
@@ -1611,6 +1688,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
       const info = S.mode === "library" ? selectionInfo() : null;
       if (!info) { if (!seltool.matches(":hover")) hideSelTool(); return; }
       lastSel = { ...info, iid: S.cur, t: Date.now() };
+      seltool.querySelectorAll("[data-st]").forEach(bb => { bb.hidden = !info.segs.length && bb.dataset.st !== "copy"; });     // 見出しだけの選択は、コピーだけ
       seltool.hidden = false;
       const r = info.rect, w = seltool.offsetWidth, h = seltool.offsetHeight;
       let top = r.bottom + 10; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 10);
@@ -1625,7 +1703,8 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     if (!info && lastSel && lastSel.iid === S.cur && Date.now() - lastSel.t < 60000) info = lastSel;
     if (!info) return hideSelTool();
     const k = b.dataset.st;
-    if (k === "copy") { try { await navigator.clipboard.writeText(info.text); toast("コピーしました。", 1500); } catch {} hideSelTool(); return; }
+    if (k === "copy") { try { await navigator.clipboard.writeText(info.copy || info.text); toast("コピーしました。", 1500); } catch {} hideSelTool(); return; }
+    if (!info.segs.length) return hideSelTool();
     if (k === "memo") { const id = addNote(info, "y", ""); return openNote(S.cur, id, true); }
     addNote(info, k, "");
   });
@@ -1666,7 +1745,8 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     const gn = e.target.closest("[data-gonote]"); if (gn) { hidePop(); return goNote(...gn.dataset.gonote.split("|")); }
     const fb = e.target.closest("[data-font]");
     if (fb) { O.font = fb.dataset.font; ls.set(OPTK, O); applyFont(); $$("#bpop [data-font]").forEach(b => b.setAttribute("aria-pressed", String(b === fb))); return; }
-    const fin = e.target.closest("[data-fin]"); if (fin) { toggleFin(fin.dataset.fin); return; }
+    const bs = e.target.closest("[data-bst]"); if (bs) { setReadState(bs.dataset.bid, bs.dataset.bst); return; }
+    const fv = e.target.closest("[data-fav]"); if (fv) { toggleFav(fv.dataset.fav); return; }
     if (e.target.closest("[data-resum]")) { hidePop(); return resummarize(); }
     const iid = pop.dataset.iid, id = pop.dataset.nid, n = RS.notes[iid]?.[id];
     if (!n) return;
@@ -1694,22 +1774,40 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     const r = recDb().items[iid] || {}, fin = RS.fin[iid]?.v;
     const ns = liveNotes(iid).sort((a, b) => (a.at || 0) - (b.at || 0)), old = (S.notes || []).filter(n => n.id === iid);
     return `<div class="recline">開いた ${r.opens || 0} 回 ・ 読んだ時間 ${Math.round((r.sec || 0) / 60)} 分${r.last ? " ・ 最後 " + md(r.last) : ""}${fin ? '<span class="finb">読了</span>' : ""}</div>
-      <button class="lnk" data-fin="${iid}">${fin ? "未読に戻す" : "読了にする"}</button>`
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 8px">${stBtns(iid)}${favToggle(iid)}</div>`
       + ns.map(n => `<div class="nmini" style="border-left-color:${COLHEX[n.color]}" data-gonote="${iid}|${n.id}"><div>${esc(n.quote)}</div>${n.text ? `<div class="nm">📝 ${esc(n.text)}</div>` : ""}<div class="nm">${NCOL[n.color] || ""} ・ ${SECN[n.f] || ""}</div></div>`).join("")
       + (old.length ? `<div class="recline" style="margin-top:10px">旧形式のマーカー（Notion の本文に入っているもの）</div>` + old.map(n => `<div class="nmini" style="border-left-color:${COLHEX[({ 1: "y", 2: "g", 3: "p" })[n.c]] || "var(--foil)"}"><div>${esc(n.t)}</div><div class="nm">${esc(n.f)}</div></div>`).join("") : "")
       + (!ns.length && !old.length ? `<p class="recline">マーカーとメモは、本文の文字を選ぶと付けられます。</p>` : "");
   }
-  function toggleFin(iid) {
-    RS.fin[iid] = { v: !RS.fin[iid]?.v, at: Date.now() }; saveRS(true);
-    const it = S.byId.get(iid);
-    if ($("#bpop").querySelector(`[data-fin="${iid}"]`)) { const a = $("#bpop"); a.querySelector(".recline")?.parentElement && showPop(`<h3>記録</h3>${recHtml(iid)}`, $("#recBtn")); }
-    if (S.detail === iid && it) openDetail(iid);
+  /* ---------- 読書の状態(未読・読書中・読了)とお気に入り(書庫と同じ。記録と同じ暗号化同期) ---------- */
+  // 開いたことがあれば「読書中」。自分で選んだ「未読」「読書中」を優先(そのあと開く・読了にするまで)。読了は fin
+  const stateOf = id => { const x = RS.stx?.[id], f = RS.fin[id]; if (x?.v && x.at >= (f?.at || 0)) return x.v; return f?.v ? "done" : RS.pos[id] ? "reading" : "unread"; };
+  const stLabel = id => { const s = stateOf(id); return s === "done" ? " ・ 読了" : s === "reading" ? " ・ 読書中" : ""; };
+  const isFav = id => !!RS.fav[id]?.v;
+  const favStar = id => `<span class="fav${isFav(id) ? " on" : ""}" data-fav="${id}" role="button" aria-pressed="${isFav(id)}" aria-label="お気に入り">${isFav(id) ? "★" : "☆"}</span>`;
+  const favToggle = id => `<button type="button" class="chip${isFav(id) ? " on" : ""}" data-fav="${id}" aria-pressed="${isFav(id)}">${isFav(id) ? "★ お気に入り" : "☆ お気に入り"}</button>`;
+  const stBtns = id => { const cur = stateOf(id); return `<div class="stbtns" role="radiogroup" aria-label="読書の状態">${[["unread", "未読"], ["reading", "読書中"], ["done", "読了"]].map(([k, l]) => `<button type="button" class="chip${cur === k ? " on" : ""}" role="radio" aria-checked="${cur === k}" data-bst="${k}" data-bid="${id}">${l}</button>`).join("")}</div>`; };
+  function refreshStateUI(iid) {
+    const it = S.byId.get(iid); if (!it) return;
+    if ($("#bpop").querySelector(`[data-bid="${iid}"], [data-fav="${iid}"]`)) showPop(`<h3>記録</h3>${recHtml(iid)}`, $("#recBtn"));
+    if (S.detail === iid) openDetail(iid);
     if (S.cur === iid && S.curBundle) renderBundle(it, S.curBundle, true);
     drawList();
   }
+  function setReadState(iid, st) {                          // 読了 ↔ 読書中 ↔ 未読。開いた記録(位置)は消さない
+    const at = Date.now();
+    if (st === "done") { RS.fin[iid] = { v: true, at }; RS.stx[iid] = { v: null, at }; }
+    else { RS.fin[iid] = { v: false, at }; RS.stx[iid] = { v: st, at }; }
+    saveRS(true); refreshStateUI(iid);
+  }
+  function toggleFav(iid) { RS.fav[iid] = { v: !isFav(iid), at: Date.now() }; saveRS(true); refreshStateUI(iid); }
+  function updateFavBtn() { const b = $("#favBtn"), on = !!S.cur && isFav(S.cur); b.setAttribute("aria-pressed", String(on)); b.textContent = (on ? "★" : "☆") + " お気に入り"; }
+  $("#favBtn").addEventListener("click", () => { if (S.cur) toggleFav(S.cur); });
+  $("#fbar").addEventListener("click", e => { const c = e.target.closest("[data-sf]"); if (!c) return; S.sf = c.dataset.sf; ls.set("clipstock.sf", S.sf); closeDetail(); drawList(); });
   function detailHtml(it) {
     return `<div class="sdetail"><button class="sback" data-gback="1">‹ 一覧へ</button>
       <div class="shead">${thumbBox(it)}<div><span class="it-title">${esc(it.t)}</span><span class="it-meta">${esc(kindOf(it))} ・ ${md(it.c)}${it.d ? " ・ " + dur(it.d) : ""}${RS.fin[it.id]?.v ? '<span class="finb">読了</span>' : ""}</span></div></div>
+      <div class="sdet-actions">${stBtns(it.id)}${favToggle(it.id)}</div>
       <details class="acc" data-acck="kind"${ACC.kind ? " open" : ""}><summary>種別<span class="cnt" data-kcnt="1">${esc(kindOf(it))}</span></summary><div class="accbody">${kindEditor(it)}</div></details>
       <details class="acc" data-acck="tags"${ACC.tags ? " open" : ""}><summary>タグ<span class="cnt" data-tcnt="1">${effTags(it).length}</span></summary><div class="accbody">${tagEditor(it)}</div></details>
       <details class="acc" data-acck="toc"${ACC.toc ? " open" : ""}><summary>目次<span class="cnt">6</span></summary><div class="accbody">${tocButtons(it)}</div></details>
@@ -1828,12 +1926,15 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     for (const x of S.items) { if (isDup(x) || (onlyDone && x.st !== "要約済み")) continue; for (const t of effTags(x)) m.set(t, (m.get(t) || 0) + 1); }
     return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"));
   }
-  function drawTagMenu() {
-    const voc = tagVocab(true), none = S.items.filter(x => x.st === "要約済み" && !isDup(x) && !effTags(x).length).length;
-    if (S.tag.startsWith("t:") && !voc.some(([t]) => t === S.tag.slice(2))) S.tag = "all";
+  function drawTagMenu() {          // 種別を選んでいるときは、その種別の中のタグだけを出す(件数も、その種別の中)
+    const kind = S.kind === "all" ? "" : S.kind.slice(2);
+    const pool = S.items.filter(x => x.st === "要約済み" && !isDup(x) && (!kind || kindOf(x) === kind));
+    const m = new Map(); pool.forEach(x => effTags(x).forEach(t => m.set(t, (m.get(t) || 0) + 1)));
+    const voc = [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja")), none = pool.filter(x => !effTags(x).length).length;
+    if (S.tag.startsWith("t:") && !m.has(S.tag.slice(2))) S.tag = "all";
     const sel = $("#tagSel");
     sel.innerHTML = [["all", "タグ：すべて"], ["none", `タグなし（${none}）`], ...voc.map(([t, n]) => ["t:" + t, `${t}（${n}）`])].map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
-    sel.value = S.tag;
+    sel.value = S.tag; sel.title = kind ? `「${kind}」の中のタグ` : "タグで絞り込む";
     $("#taglist").innerHTML = tagVocab(false).map(([t]) => `<option value="${esc(t)}"></option>`).join("");
   }
   const tagPending = new Set(); let tagBusy = false;
@@ -2037,7 +2138,7 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
 
   /* ---------- 操作 ---------- */
   $$(".bar .hb[data-m]").forEach(b => b.addEventListener("click", () => mode(b.dataset.m)));
-  $("#kind").addEventListener("change", e => { S.kind = e.target.value; closeDetail(); drawList(); });
+  $("#kind").addEventListener("change", e => { S.kind = e.target.value; drawTagMenu(); closeDetail(); drawList(); });
   $("#q").addEventListener("input", e => { S.q = e.target.value; if (S.mode !== "library") mode("library"); closeDetail(); drawList(); });
   $("#reload").addEventListener("click", async () => {
     setStatus("web-archive から読み直しています…");
@@ -2045,25 +2146,26 @@ body.imm .stage{padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
     catch (e) { setStatus(e.message); }
   });
   $("#list").addEventListener("click", e => {
+    if (e.target.closest("[data-fav]")) return;                  // ★ は、開かずに、お気に入りの切り替え(#shelf 側で処理)
     const b = e.target.closest(".item"); if (!b) return;
     if (S.selMode) { const id = b.dataset.id; S.tsel.has(id) ? S.tsel.delete(id) : S.tsel.add(id); b.classList.toggle("sel", S.tsel.has(id)); updateBulk(); return; }   // 選択モードでは、開かずに選ぶ
     openItem(b.dataset.id);
   });
-  $("#backBtn").addEventListener("click", () => setReading(false));
   $("#tile").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.tile = b.dataset.t; $$("#tile button").forEach(x => x.classList.toggle("on", x === b)); savePrefs(); drawList(); });
   $("#sort").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.sort = b.dataset.s; $$("#sort button").forEach(x => x.classList.toggle("on", x === b)); savePrefs(); drawList(); });
   $("#wideBtn").addEventListener("click", e => {          // 一覧を画面いっぱいに広げる(本文は隠れる)
     S.wide = !S.wide; $("#app").classList.toggle("wide", S.wide);
     e.currentTarget.setAttribute("aria-pressed", String(S.wide)); e.currentTarget.textContent = S.wide ? "全画面を終了" : "全画面";
     if (!S.wide && !mobile()) setReading(false);
-    drawList();
+    drawList(); updateTabbar();
   });
   $("#shelf").addEventListener("click", e => {             // 「目次・記録 ›」と、詳細ペインの操作
     const more = e.target.closest("[data-gb]"); if (more) return openDetail(more.dataset.gb);
     if (e.target.closest("[data-gback]")) return closeDetail();
     const t = e.target.closest("[data-toc]"); if (t) return gotoToc(t.dataset.iid, t.dataset.toc);
     const gn = e.target.closest("[data-gonote]"); if (gn) return goNote(...gn.dataset.gonote.split("|"));
-    const fin = e.target.closest("[data-fin]"); if (fin) toggleFin(fin.dataset.fin);
+    const bs = e.target.closest("[data-bst]"); if (bs) { setReadState(bs.dataset.bid, bs.dataset.bst); return; }
+    const fv = e.target.closest("[data-fav]"); if (fv) toggleFav(fv.dataset.fav);
   });
   $("#wm").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setWm(b.dataset.wm === "v"); });
   $("#fsUp").addEventListener("click", () => setFs(1));
