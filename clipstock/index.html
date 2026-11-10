@@ -369,6 +369,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
 .sdet-actions{display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px}
 .stbtns{display:flex; flex-wrap:wrap; gap:6px}
 #favBtn[aria-pressed="true"]{color:var(--foil-text); border-color:var(--foil); background:var(--foil-soft)}
+#finBtn[aria-pressed="true"]{color:#fff; border-color:var(--ok); background:var(--ok)}
 
 @media (max-width:820px){
   #wideBtn{display:none}
@@ -482,6 +483,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       <button class="tb" id="fsDown" aria-label="文字を小さく">A−</button>
       <button class="tb" id="fsUp" aria-label="文字を大きく">A＋</button>
       <button class="tb" id="favBtn" aria-pressed="false" title="お気に入り">☆ お気に入り</button>
+      <button class="tb" id="finBtn" aria-pressed="false" title="読了にする（もう一度押すと、読書中に戻す）">○ 読了</button>
       <button class="tb" id="tocBtn" aria-haspopup="dialog">目次</button>
       <button class="tb" id="recBtn" aria-haspopup="dialog" title="この動画のマーカーとメモ">記録<span class="rc" id="recN"></span></button>
       <button class="tb" id="kindBtn" aria-haspopup="dialog" title="この動画の種別（1つだけ選べます）">種別</button>
@@ -1030,7 +1032,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
   function renderBundle(it, b, keep) {
     S.curBundle = b;
     $("#vhead").innerHTML = `<h1>${esc(b.title || it.t)}${isNew(it) ? '<span class="newb">新着</span>' : ""}${RS.fin[it.id]?.v ? '<span class="finb">読了</span>' : ""}</h1><div class="sub"><span>${esc(kindOf(it))} ・ ${md(it.c)}${it.d ? " ・ " + dur(it.d) : ""}${b.model ? " ・ " + esc(b.model) : ""}</span></div>`;
-    $("#openSrc").disabled = !b.url; updateKindBtn(); updateFavBtn();
+    $("#openSrc").disabled = !b.url; updateKindBtn(); updateFavBtn(); updateFinBtn();
     $("#openSrc").textContent = it.src === "web" ? "▶ 記事を開く" : "▶ 動画を開く";
     renderStage(keep);
   }
@@ -1977,6 +1979,14 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
   function toggleFav(iid) { RS.fav[iid] = { v: !isFav(iid), at: Date.now() }; saveRS(true); refreshStateUI(iid); }
   function updateFavBtn() { const b = $("#favBtn"), on = !!S.cur && isFav(S.cur); b.setAttribute("aria-pressed", String(on)); b.textContent = (on ? "★" : "☆") + " お気に入り"; }
   $("#favBtn").addEventListener("click", () => { if (S.cur) toggleFav(S.cur); });
+  /* 読了ボタン(ON/OFF)。ON で読了、OFF で読書中に戻す。記録と同じく暗号化して同期し、ほかの端末にも出る */
+  function updateFinBtn() { const b = $("#finBtn"), on = !!S.cur && stateOf(S.cur) === "done"; b.disabled = !S.cur; b.setAttribute("aria-pressed", String(on)); b.textContent = (on ? "✓" : "○") + " 読了"; }
+  $("#finBtn").addEventListener("click", () => {
+    if (!S.cur) return;
+    const on = stateOf(S.cur) !== "done";
+    setReadState(S.cur, on ? "done" : "reading"); updateFinBtn();
+    toast(on ? "読了にしました。" : "読了を外しました（読書中に戻しました）。", 1800);
+  });
   $("#fbar").addEventListener("click", e => { const c = e.target.closest("[data-sf]"); if (!c) return; S.sf = c.dataset.sf; ls.set("clipstock.sf", S.sf); closeDetail(); drawList(); });
   function detailHtml(it) {
     return `<div class="sdetail"><button class="sback" data-gback="1">‹ 一覧へ</button>
