@@ -131,7 +131,10 @@ function doPost(e) {
         break;
       // ---- ClipStock 追加(Summarize.gs) ----
       case 'summarize':
-        result = csSummarize_(body.pageId, body.source);
+        result = csSummarize_(body.pageId, body.source, body.ai);
+        break;
+      case 'testAi':
+        result = csTestAi_(body.ai);
         break;
       case 'importSummary':
         result = csImportSummary_(body.pageId, body.json, body.source);

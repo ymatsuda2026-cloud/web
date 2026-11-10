@@ -1,13 +1,17 @@
 /**
  * ClipStock 用「要約の窓口」。既存の Code.gs と同じ Apps Script プロジェクトに追加する。
  *
- * 追加するスクリプトプロパティ:
- *   GEMINI_API_KEY   Gemini の API キー(必須。ブラウザには持たせない)
+ * 要約に使う AI:
+ *   ClipStock の変換管理「要約AI」で設定した AI(Gemini / Claude / OpenAI)を使う。
+ *   キーは依頼のたびにブラウザから届き、ここには保存しない(ブラウザ側は暗号化して記録に保存)。
+ *   画面で未設定のときだけ、次のスクリプトプロパティの Gemini を使う(どちらも省略可):
+ *   GEMINI_API_KEY   Gemini の API キー
  *   GEMINI_MODEL     省略時 gemini-2.5-flash
  *   APPLY_CONTEXT    応用の切り口(省略可。例: 「受託開発・SES・保守運用の現場」)
  *
  * Code.gs の doPost の switch に次の2行を足す(SETUP.md 参照):
- *   case 'summarize':     result = csSummarize_(body.pageId, body.source); break;
+ *   case 'summarize':     result = csSummarize_(body.pageId, body.source, body.ai); break;
+ *   case 'testAi':        result = csTestAi_(body.ai); break;
  *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source); break;
  *
  * (Claude.ai に貼るプロンプトは ClipStock の画面側で作る。ここでは作らない)
@@ -20,12 +24,18 @@
 var CS_TRANSCRIPT_LIMIT = 100000;   // 文字起こしを渡す上限(文字)
 var CS_BUDGET_MS = 300000;          // GAS は6分で切れる。5分を過ぎたら残りの段を諦める
 var CS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+var CS_OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+var CS_ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+var CS_DEFAULT_MODEL = { gemini: 'gemini-2.5-flash', anthropic: 'claude-sonnet-5-5', openai: 'gpt-5-mini' };
+var CS_PROVIDER_NAME = { gemini: 'Gemini', anthropic: 'Claude', openai: 'OpenAI' };
+var CS_AI = null;                   // この依頼で使う AI({provider, model, key})。csUseAi_ で決める
 
 // ================= エントリー =================
 
-/** Gemini で5段を順に作って保存する。サマリが作れなければ保存せずエラー */
-function csSummarize_(pageId, source) {
+/** 設定した AI で5段を順に作って保存する。サマリが作れなければ保存せずエラー */
+function csSummarize_(pageId, source, ai) {
   var started = Date.now();
+  csUseAi_(ai);
   var detail = csDetail_(pageId, source);
   var transcript = String(csTranscript_(pageId, source) || '');
   if (transcript.replace(/\s/g, '').length < 50) throw new Error('文字起こしがありません(または短すぎます)');
@@ -67,7 +77,14 @@ function csSummarize_(pageId, source) {
   });
 
   saveGenerated_(pageId, out, model, transcript.length, source);
-  return { detail: out, model: model, rawCount: transcript.length, failed: failed, generatedAt: new Date().toISOString() };
+  return { detail: out, model: model, provider: CS_AI.provider, rawCount: transcript.length, failed: failed, generatedAt: new Date().toISOString() };
+}
+
+/** 「要約AI」の設定を試す(Notion には触らない)。短い問いを1回だけ送る */
+function csTestAi_(ai) {
+  csUseAi_(ai);
+  var p = csJson_(csAsk_('次のJSONをそのまま返してください: {"ok": true}' + '\n' + CS_NO_FENCE));
+  return { ok: !!p.ok, provider: CS_AI.provider, model: CS_AI.model, fromScript: !!CS_AI.fromScript };
 }
 
 /** Claude.ai が返したJSONを取り込んで保存する */
@@ -92,9 +109,26 @@ function csImportSummary_(pageId, jsonText, source) {
 function csDetail_(pageId, source) { return fetchDetail_(pageId, source); }
 function csTranscript_(pageId, source) { return fetchTranscript_(pageId, source).text; }
 
-// ================= Gemini =================
+// ================= AI(Gemini / Claude / OpenAI) =================
 
-function csModel_() { return PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') || 'gemini-2.5-flash'; }
+/** ブラウザから届いた設定を使う。無ければスクリプトプロパティの Gemini */
+function csUseAi_(ai) {
+  ai = ai || {};
+  var provider = String(ai.provider || '').toLowerCase();
+  var key = String(ai.key || '').trim();
+  if (provider && key) {
+    if (!CS_DEFAULT_MODEL[provider]) throw new Error('対応していない AI です: ' + provider);
+    CS_AI = { provider: provider, model: String(ai.model || '').trim() || CS_DEFAULT_MODEL[provider], key: key };
+    return CS_AI;
+  }
+  var p = PropertiesService.getScriptProperties();
+  var gk = p.getProperty('GEMINI_API_KEY');
+  if (!gk) throw new Error('AI_NOT_SET: 要約AIが設定されていません。ClipStock の変換管理「要約AI」で、AI と API キーを設定してください');
+  CS_AI = { provider: 'gemini', model: p.getProperty('GEMINI_MODEL') || CS_DEFAULT_MODEL.gemini, key: gk, fromScript: true };
+  return CS_AI;
+}
+
+function csModel_() { return (CS_AI || csUseAi_(null)).model; }
 
 function csContextHint_() {
   var c = PropertiesService.getScriptProperties().getProperty('APPLY_CONTEXT');
@@ -104,42 +138,55 @@ function csContextHint_() {
 function csTail_(instructions) { return '\n\n----------------\n\n' + instructions + '\n' + CS_NO_FENCE; }
 
 function csAsk_(user) {
-  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-  if (!key) throw new Error('GEMINI_API_KEY が未設定です');
-  var body = {
-    model: csModel_(),
-    temperature: 0.3,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: '日本語で回答してください。' },
-      { role: 'user', content: user },
-    ],
-  };
+  var ai = CS_AI || csUseAi_(null);
+  var name = CS_PROVIDER_NAME[ai.provider];
+  var system = '日本語で回答してください。';
+  var req;
+  if (ai.provider === 'anthropic') {
+    req = { url: CS_ANTHROPIC_ENDPOINT,
+      headers: { 'x-api-key': ai.key, 'anthropic-version': '2023-06-01' },
+      body: { model: ai.model, max_tokens: 8192, system: system + CS_NO_FENCE, messages: [{ role: 'user', content: user }] } };
+  } else {
+    var body = { model: ai.model, response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+    if (ai.provider === 'gemini') body.temperature = 0.3;   // OpenAI の新しいモデルは temperature を受け付けないことがあるので送らない
+    req = { url: ai.provider === 'openai' ? CS_OPENAI_ENDPOINT : CS_ENDPOINT,
+      headers: { Authorization: 'Bearer ' + ai.key }, body: body };
+  }
   var tries429 = 0, tries5xx = 0;
   for (;;) {
-    var res = UrlFetchApp.fetch(CS_ENDPOINT, {
+    var res = UrlFetchApp.fetch(req.url, {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-      headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body),
+      headers: req.headers, payload: JSON.stringify(req.body),
     });
     var code = res.getResponseCode();
     var text = res.getContentText();
     if (code === 200) {
-      var json = JSON.parse(text);
-      var content = json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
-      if (!String(content || '').trim()) throw new Error('AIから応答がありませんでした');
+      var content = csContent_(ai.provider, JSON.parse(text));
+      if (!String(content || '').trim()) throw new Error(name + ' から応答がありませんでした');
       return content;
     }
+    if (code === 401 || code === 403) throw new Error(name + ' の API キーが違うか、使えない状態です(HTTP ' + code + ')。変換管理の「要約AI」で確かめてください');
+    if (code === 404) throw new Error(name + ' のモデル「' + ai.model + '」が見つかりません。変換管理の「要約AI」でモデル名を確かめてください');
     if (code === 429) {
-      // 1日の上限は待っても直らない。分あたりの上限だけ指数バックオフで待つ
-      var daily = /quota|exceeded your current quota/i.test(text) && !/per minute|rpm/i.test(text);
-      if (daily) throw new Error('Gemini の1日の利用上限に達しています。日付が変わるまで待ってください');
-      if (tries429 >= 3) throw new Error('Gemini の利用制限が続いています。少し待ってやり直してください');
+      // 1日(または残高)の上限は待っても直らない。分あたりの上限だけ指数バックオフで待つ
+      var hard = /insufficient_quota|billing|credit balance|exceeded your current quota/i.test(text) && !/per minute|rpm|rate.?limit/i.test(text);
+      if (hard) throw new Error(name + ' の利用上限(または残高)に達しています。時間をおくか、契約の状態を確かめてください');
+      if (tries429 >= 3) throw new Error(name + ' の利用制限が続いています。少し待ってやり直してください');
       Utilities.sleep(15000 * Math.pow(2, tries429++));
       continue;
     }
-    if (code >= 500 && tries5xx < 2) { Utilities.sleep(5000); tries5xx++; continue; }
-    throw new Error('Gemini HTTP ' + code + ': ' + text.slice(0, 200));
+    if ((code >= 500 || code === 529) && tries5xx < 2) { Utilities.sleep(5000); tries5xx++; continue; }
+    throw new Error(name + ' HTTP ' + code + ': ' + text.slice(0, 200));
   }
+}
+
+/** 応答から本文を取り出す(Claude は content[] の text、ほかは choices[0].message.content) */
+function csContent_(provider, json) {
+  if (provider === 'anthropic') {
+    return (json.content || []).filter(function (c) { return c.type === 'text'; }).map(function (c) { return c.text; }).join('');
+  }
+  return json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
 }
 
 function csJson_(text) {
@@ -320,12 +367,13 @@ function csIdeasToText_(list) {
 function csSelfTest() {
   var p = PropertiesService.getScriptProperties();
   var lines = [];
-  ['ACCESS_TOKEN', 'NOTION_TOKEN', 'VIDEO_DB_ID', 'GEMINI_API_KEY'].forEach(function (k) {
+  ['ACCESS_TOKEN', 'NOTION_TOKEN', 'VIDEO_DB_ID'].forEach(function (k) {
     lines.push('プロパティ ' + k + ': ' + (p.getProperty(k) ? 'OK' : '★未設定'));
   });
+  lines.push('プロパティ GEMINI_API_KEY: ' + (p.getProperty('GEMINI_API_KEY') ? 'あり' : 'なし(ClipStock の「要約AI」で設定していれば不要)'));
   lines.push('プロパティ WEB_NOTION_TOKEN / WEB_DB_ID: ' + (p.getProperty('WEB_NOTION_TOKEN') ? 'あり' : 'なし(web記事を使わなければ不要)') + ' / ' + (p.getProperty('WEB_DB_ID') ? 'あり' : 'なし'));
   [['doPost', typeof doPost], ['saveField_', typeof saveField_], ['saveMemo_', typeof saveMemo_], ['fetchDetail_', typeof fetchDetail_],
-   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_]]
+   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_], ['csTestAi_', typeof csTestAi_]]
     .forEach(function (x) { lines.push('関数 ' + x[0] + ': ' + (x[1] === 'function' ? 'OK' : '★見つかりません(貼り付けが足りない)')); });
   if (typeof doPost === 'function') {
     var body = { action: 'importSummary', token: p.getProperty('ACCESS_TOKEN'), pageId: '', json: '', source: 'video' };
@@ -348,6 +396,7 @@ function doGet() {
     doPost: typeof doPost === 'function',
     summarize: typeof csSummarize_ === 'function',
     importSummary: typeof csImportSummary_ === 'function',
+    testAi: typeof csTestAi_ === 'function',
     saveField: typeof saveField_ === 'function',
     hasAccessToken: !!p.getProperty('ACCESS_TOKEN'),
     hasNotionToken: !!p.getProperty('NOTION_TOKEN'),

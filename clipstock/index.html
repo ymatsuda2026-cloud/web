@@ -290,6 +290,8 @@ details.acc > summary .cnt{font-weight:400; color:var(--muted); font-size:12px}
 .nmini{border-left:4px solid var(--foil); background:var(--sheet); border-radius:6px; padding:7px 10px; margin:6px 0; cursor:pointer; font-size:13px; line-height:1.6}
 .nmini{white-space:pre-line}
 .nmini .nm{font-size:11.5px; color:var(--muted); margin-top:2px}
+.f select{width:100%; border:1px solid var(--line); background:var(--sheet); color:inherit; border-radius:6px; padding:9px 10px; font-size:14px}
+.msg.ok{color:var(--muted)}
 .recline{font-size:12.5px; color:var(--muted); margin:2px 0 8px; line-height:1.8}
 .finb{display:inline-block; font-size:10.5px; color:#fff; background:var(--ok); border-radius:9px; padding:0 7px; margin-left:6px}
 
@@ -513,7 +515,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
     <input type="search" id="mq" placeholder="タイトルで探す" aria-label="タイトルで探す">
     <span class="sp"></span>
     <button class="tb" id="mAll">要約待ちを全選択</button>
-    <button class="tb main" id="mGo" disabled>選択を要約する</button>
+    <button class="tb main" id="mGo" disabled>選択を要約する</button><button class="tb" id="mAiSet" title="「選択を要約する」で使う AI と API キー" aria-haspopup="dialog">要約AI</button>
     <button class="tb" id="mClaudeAll">Claude.ai で要約待ちを変換</button><button class="tb" id="mClaudeSet" title="開く先（アーティファクトの URL）を変える" aria-label="開く先を変える">⚙</button>
     <button class="tb" id="mDel" disabled title="重複したものを、Notion のゴミ箱へ移す">重複を削除</button>
   </div>
@@ -1115,6 +1117,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
 
   /* ---------- 変換管理 ---------- */
   function drawManage() {
+    try { drawAiBtn(); } catch {}
     const LBL = { todo: ["未変換", "todo"], queue: ["要約待ち", "queue"], done: ["要約済み", "done"], dup: ["重複", "dup"] };
     const q = S.mq.trim().toLowerCase();
     const all = S.items.slice().sort((a, b) => (b.c || "").localeCompare(a.c || ""));
@@ -1169,19 +1172,87 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
     const targets = ids.map(id => S.byId.get(id)).filter(x => x && !isDup(x) && group(x.st) !== "todo");
     if (!targets.length || S.busy) return;
     if (!secret.gas) { $("#mnote").textContent = "要約の窓口（GAS）が未登録です。"; return; }
+    const ai = aiCfg();
     S.busy = true; let ok = 0; const bad = [];
     for (let i = 0; i < targets.length; i++) {
       const x = targets[i]; S.run[x.id] = "run"; drawManage();
-      $("#mnote").textContent = `要約中 ${i + 1}/${targets.length}：${x.t}\n（1本あたり1〜3分ほどかかります。このまま開いておいてください）`;
+      $("#mnote").textContent = `要約中 ${i + 1}/${targets.length}（${aiLabel(ai)}）：${x.t}\n（1本あたり1〜3分ほどかかります。このまま開いておいてください）`;
       try {
-        const r = await gas("summarize", { pageId: x.id, source: x.src }, { waits: [400, 1500] });
+        const r = await gas("summarize", { pageId: x.id, source: x.src, ai: aiPayload(ai) }, { waits: [400, 1500] });
         applySummary(x.id, r); S.bundles.delete(x.id); delete S.run[x.id]; S.sel.delete(x.id); ok++;
         if (r.failed?.length) bad.push(`${x.t}（${r.failed.join("・")} は作れませんでした）`);
-      } catch (e) { S.run[x.id] = "err"; bad.push(`${x.t}：${e.message}`); }
+      } catch (e) {
+        S.run[x.id] = "err"; const m = aiError(e.message, ai); bad.push(`${x.t}：${m}`);
+        if (/^AI_NOT_SET|GEMINI_API_KEY/.test(e.message)) {                // 設定が無い・GAS が古い: 残りも同じ理由で失敗するので止める
+          targets.slice(i + 1).forEach(y => delete S.run[y.id]); drawAll(); break;
+        }
+      }
       drawAll();
     }
     S.busy = false; drawManage(); drawKind();
     $("#mnote").textContent = `${ok} 件を要約しました。一覧に並んでいます（次の書き出しで web-archive にも反映されます）。` + (bad.length ? "\n" + bad.join("\n") : "");
+  }
+  /* ---------- 要約AI(「選択を要約する」で使う AI)。暗号化して記録に保存し、ほかの端末でも使う ---------- */
+  const AI_LIST = {
+    anthropic: { name: "Claude", model: "claude-sonnet-5-5", models: ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"], key: "sk-ant-…", where: "console.anthropic.com の API Keys" },
+    gemini: { name: "Gemini", model: "gemini-2.5-flash", models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"], key: "AIza…", where: "Google AI Studio の API キー" },
+    openai: { name: "OpenAI", model: "gpt-5-mini", models: ["gpt-5-mini", "gpt-5", "gpt-4.1-mini"], key: "sk-…", where: "platform.openai.com の API keys" },
+  };
+  const aiCfg = () => { const v = RS.misc.ai?.v; return v && AI_LIST[v.provider] && v.key ? v : null; };
+  const aiPayload = ai => ai ? { provider: ai.provider, model: ai.model || AI_LIST[ai.provider].model, key: ai.key } : null;
+  const aiLabel = ai => ai ? `${AI_LIST[ai.provider].name}・${ai.model || AI_LIST[ai.provider].model}` : "GAS の Gemini";
+  function aiError(m, ai) {
+    if (/^AI_NOT_SET/.test(m)) return "要約AIが設定されていません。「要約AI」で、AI と API キーを設定してください。";
+    if (/GEMINI_API_KEY/.test(m)) return ai
+      ? "要約の窓口（GAS）が古いままで、設定した AI を使えません。新しい Summarize.gs と Code.gs を貼り、「新バージョン」でデプロイし直してください。"
+      : "要約AIが設定されていません。「要約AI」で、AI と API キーを設定してください。";
+    return m;
+  }
+  function drawAiBtn() { const ai = aiCfg(); $("#mAiSet").textContent = ai ? `要約AI：${AI_LIST[ai.provider].name}` : "要約AI：未設定"; }
+  function aiDialog() {
+    const cur = RS.misc.ai?.v || null;
+    const prov = cur && AI_LIST[cur.provider] ? cur.provider : "anthropic";
+    const opt = Object.entries(AI_LIST).map(([k, v]) => `<option value="${k}" ${k === prov ? "selected" : ""}>${v.name}</option>`).join("");
+    popOpen("要約AI", `<p>「選択を要約する」で使う AI です。ここで設定した AI で、サマリ・マップ・分野別・応用・活用を作ります。</p>
+      <label class="f"><span>AI</span><select id="aiProv">${opt}</select></label>
+      <label class="f"><span>モデル</span><input id="aiModel" list="aiModels" autocapitalize="off" spellcheck="false"><datalist id="aiModels"></datalist></label>
+      <label class="f"><span>API キー</span><input id="aiKey" type="password" autocapitalize="off" spellcheck="false" autocomplete="off"></label>
+      <div class="acts" style="flex-wrap:wrap"><button class="tb main" id="aiSave">保存する</button><button class="tb" id="aiTest">接続を試す</button>${cur ? '<button class="tb" id="aiDel">設定を消す</button>' : ""}</div>
+      <div class="msg" id="aiMsg"></div>
+      <p class="recline">API キーは、暗号化して記録に保存し、ほかの端末でも使います。要約を頼むたびに窓口（GAS）へ送りますが、GAS には保存しません。利用料は、そのキーの契約にかかります。<br>未設定のときは、GAS のスクリプトプロパティ（GEMINI_API_KEY）の Gemini を使います。</p>`, () => {
+      const fill = (keepModel) => {
+        const p = $("#aiProv").value, d = AI_LIST[p], same = cur && cur.provider === p;
+        $("#aiModels").innerHTML = d.models.map(m => `<option value="${m}">`).join("");
+        if (!keepModel) $("#aiModel").value = same ? (cur.model || d.model) : d.model;
+        $("#aiModel").placeholder = d.model;
+        $("#aiKey").value = ""; $("#aiKey").placeholder = same && cur.key ? "保存済み（変えるときだけ入力）" : d.key;
+        $("#aiMsg").textContent = ""; $("#aiMsg").className = "msg";
+        $("#aiMsg").title = d.where;
+      };
+      fill(false);
+      $("#aiProv").onchange = () => fill(false);
+      const read = () => {
+        const p = $("#aiProv").value, key = $("#aiKey").value.trim() || (cur && cur.provider === p ? cur.key : "");
+        return { provider: p, model: $("#aiModel").value.trim() || AI_LIST[p].model, key };
+      };
+      const say = (t, ok) => { $("#aiMsg").textContent = t; $("#aiMsg").className = "msg" + (ok ? " ok" : ""); };
+      $("#aiSave").onclick = () => {
+        const v = read();
+        if (!v.key) { say(`API キーを入れてください（${AI_LIST[v.provider].where}で作れます）。`); return; }
+        RS.misc.ai = { v, at: Date.now() }; saveRS(true); drawAiBtn(); popClose();
+        $("#mnote").textContent = `要約AIを ${aiLabel(v)} にしました。「選択を要約する」で使います。`;
+      };
+      $("#aiTest").onclick = async () => {
+        const v = read();
+        if (!v.key) { say("API キーを入れてください。"); return; }
+        if (!secret.gas) { say("要約の窓口（GAS）が未登録です。"); return; }
+        $("#aiTest").disabled = true; say("確かめています…", true);
+        try { const r = await gas("testAi", { ai: aiPayload(v) }, { waits: [400] }); say(r?.ok ? `つながりました（${aiLabel(v)}）。保存すると使えます。` : "応答はありましたが、形が想定と違いました。", !!r?.ok); }
+        catch (e) { say(/unknown action/i.test(e.message) || /Summarize\.gs/.test(e.message) ? "要約の窓口（GAS）が古いままです。新しい Summarize.gs と Code.gs を貼り、「新バージョン」でデプロイし直してください。" : e.message); }
+        finally { if ($("#aiTest")) $("#aiTest").disabled = false; }
+      };
+      if ($("#aiDel")) $("#aiDel").onclick = () => { RS.misc.ai = { v: null, at: Date.now() }; saveRS(true); drawAiBtn(); popClose(); $("#mnote").textContent = "要約AIの設定を消しました。"; };
+    });
   }
   /* ---------- ノート画面(書庫と同じ: 色・メモで絞って見る) ---------- */
   let nKind = "all", nq = "";
@@ -2193,6 +2264,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
     else runSummaries([b.dataset.id]);
   });
   $("#mGo").addEventListener("click", () => runSummaries([...S.sel]));
+  $("#mAiSet").addEventListener("click", aiDialog);
   $("#mDel").addEventListener("click", () => deleteDups([...S.sel]));
   $("#mAll").addEventListener("click", () => {
     const ids = S.items.filter(x => grp(x) === "queue").map(x => x.id);
