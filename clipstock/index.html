@@ -1219,17 +1219,25 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
   const ollamaBase = u => String(u || OLLAMA_URL).trim().replace(/\/+$/, "").replace(/\/(api|v1)$/, "");
   function ollamaNetError(ai) {
     const base = ollamaBase(ai.url);
-    const mixed = location.protocol === "https:" && /^http:/i.test(base) && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(base);
-    return new Error(`Ollama（${base}）につながりませんでした。\n`
-      + (mixed ? "・https のページからは、http の別の機械（LAN の IP など）へはつなげません。Ollama を動かしている機械で開くか（http://localhost:11434）、https で公開した URL を使ってください。\n" : "")
-      + "・Ollama が起動しているか\n"
-      + `・Ollama の環境変数 OLLAMA_ORIGINS に ${location.origin} を入れて、Ollama を起動し直したか\n`
-      + "・Safari は、https のページから http://localhost への接続を止めることがあります（Chrome・Edge で試してください）");
+    const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(base);
+    const mixed = location.protocol === "https:" && /^http:/i.test(base) && !local;
+    const lines = [`Ollama（${base}）につながりませんでした。`];
+    if (mixed) lines.push("・https のページからは、http の別の機械（LAN の IP など）へはつなげません。Ollama を動かしている機械で開くか（http://localhost:11434）、https で公開した URL を使ってください。");
+    lines.push(local ? "・Ollama が起動しているか" : "・Ollama とトンネルが起動しているか（ブラウザの別のタブで " + base + "/api/tags を開くと、モデルの一覧の JSON が出れば通っています）");
+    if (!local) lines.push("・トンネルの URL が今のものか（ngrok・cloudflared は、起動し直すと変わることがあります）");
+    lines.push(`・Ollama の環境変数 OLLAMA_ORIGINS に ${location.origin} を入れて、Ollama を起動し直したか`);
+    if (local) lines.push("・Safari は、https のページから http://localhost への接続を止めることがあります（Chrome・Edge で試してください）");
+    return new Error(lines.join("\n"));
   }
   async function ollamaFetch(ai, path, body) {
-    const h = { "Content-Type": "application/json" }; if (ai.key) h.Authorization = "Bearer " + ai.key;
+    const base = ollamaBase(ai.url), h = {};
+    if (body) h["Content-Type"] = "application/json";
+    if (ai.key) h.Authorization = "Bearer " + ai.key;
+    // ngrok の無料版は、ブラウザからの接続に確認ページをはさむ。この印を付けると飛ばせる(旧画面 llm-client.js と同じ)。
+    // ngrok 以外に付けると、許可されていない項目として断られることがあるので、ngrok のときだけ付ける
+    if (base.includes("ngrok")) h["ngrok-skip-browser-warning"] = "true";
     let r;
-    try { r = await fetch(ollamaBase(ai.url) + path, body ? { method: "POST", headers: h, body: JSON.stringify(body) } : { headers: ai.key ? { Authorization: h.Authorization } : {} }); }
+    try { r = await fetch(base + path, body ? { method: "POST", headers: h, body: JSON.stringify(body) } : { headers: h }); }
     catch { throw ollamaNetError(ai); }
     const t = await r.text();
     if (r.status === 404 && body) throw new Error(`Ollama にモデル「${ai.model}」がありません。Ollama を動かしている機械で ollama pull ${ai.model} を実行してください。`);
@@ -1286,7 +1294,8 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       <label class="f"><span id="aiKeyLab">API キー</span><input id="aiKey" type="password" autocapitalize="off" spellcheck="false" autocomplete="off"></label>
       <p class="recline" id="aiOllamaNote">Ollama は、この画面（ブラウザ）から直接呼びます。Ollama を動かしている機械で ClipStock を開くか、https で公開した URL を入れてください。
         はじめに、Ollama の環境変数 <code>OLLAMA_ORIGINS</code> に <code>${location.origin}</code> を入れて、Ollama を起動し直してください（Mac なら <code>launchctl setenv OLLAMA_ORIGINS "${location.origin}"</code> のあと、Ollama を終了して開き直す）。
-        「読める長さ」を超える文字起こしは、先頭から入るぶんだけ渡します。大きくすると、メモリを多く使います。</p>
+        「読める長さ」を超える文字起こしは、先頭から入るぶんだけ渡します。大きくすると、メモリを多く使います。<br>
+        ほかの端末から使うときは、ngrok などで https にした URL を入れます（末尾の <code>/v1</code> はあってもなくても構いません）。</p>
       <div class="acts" style="flex-wrap:wrap"><button class="tb main" id="aiSave">保存する</button><button class="tb" id="aiTest">接続を試す</button>${cur ? '<button class="tb" id="aiDel">設定を消す</button>' : ""}</div>
       <div class="msg" id="aiMsg"></div>
       <p class="recline">API キーは、暗号化して記録に保存し、ほかの端末でも使います。要約を頼むたびに窓口（GAS）へ送りますが、GAS には保存しません。利用料は、そのキーの契約にかかります。<br>未設定のときは、GAS のスクリプトプロパティ（GEMINI_API_KEY）の Gemini を使います。</p>`, () => {
@@ -1308,7 +1317,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       const read = () => {
         const p = $("#aiProv").value, key = $("#aiKey").value.trim() || (cur && cur.provider === p ? cur.key || "" : "");
         const v = { provider: p, model: $("#aiModel").value.trim() || AI_LIST[p].model, key };
-        if (AI_LIST[p].local) { v.url = ollamaBase($("#aiUrl").value); v.ctx = Math.max(2048, Number($("#aiCtx").value) || OLLAMA_CTX); }
+        if (AI_LIST[p].local) { v.url = ollamaBase($("#aiUrl").value); $("#aiUrl").value = v.url; v.ctx = Math.max(2048, Number($("#aiCtx").value) || OLLAMA_CTX); }
         return v;
       };
       const say = (t, ok) => { $("#aiMsg").textContent = t; $("#aiMsg").className = "msg" + (ok ? " ok" : ""); };
