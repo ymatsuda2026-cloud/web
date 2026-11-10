@@ -15,9 +15,14 @@
  *   case 'aiPlan':        result = csAiPlan_(body.pageId, body.source, body.limit); break;
  *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source, body.model); break;
  *
- * Ollama はブラウザから直接呼ぶ(GAS からは手元の Ollama に届かないため)。
- * そのときの流れ: aiPlan で文字起こしと指示文を受け取る → ブラウザが Ollama で5段を作る
- *                → importSummary で、ここと同じ変換(時刻付け)をして保存する
+ *   case 'aiChat':        result = csAiChat_(body.ai, body.system, body.user); break;
+ *   case 'aiModels':      result = csAiModels_(body.ai); break;
+ *
+ * Ollama も GAS から呼ぶ。GAS は Google のサーバーで動くので、ngrok などで https にした URL が要る
+ * (http://localhost は届かない)。手元のモデルは遅く、5段を1回の実行(6分まで)に収めにくいので、
+ * 段ごとに分けて呼ぶ: aiPlan で文字起こしと指示文を受け取る → 画面が aiChat を段ごとに呼ぶ
+ *                   → importSummary で、ここと同じ変換(時刻付け)をして保存する
+ *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source); break;
  *
  * (Claude.ai に貼るプロンプトは ClipStock の画面側で作る。ここでは作らない)
  *
@@ -31,8 +36,9 @@ var CS_BUDGET_MS = 300000;          // GAS は6分で切れる。5分を過ぎ�
 var CS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 var CS_OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 var CS_ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
-var CS_DEFAULT_MODEL = { gemini: 'gemini-2.5-flash', anthropic: 'claude-sonnet-5-5', openai: 'gpt-5-mini' };
-var CS_PROVIDER_NAME = { gemini: 'Gemini', anthropic: 'Claude', openai: 'OpenAI' };
+var CS_DEFAULT_MODEL = { gemini: 'gemini-2.5-flash', anthropic: 'claude-sonnet-5-5', openai: 'gpt-5-mini', ollama: '' };
+var CS_PROVIDER_NAME = { gemini: 'Gemini', anthropic: 'Claude', openai: 'OpenAI', ollama: 'Ollama' };
+var CS_OLLAMA_CTX = 16384;
 var CS_AI = null;                   // この依頼で使う AI({provider, model, key})。csUseAi_ で決める
 
 // ================= エントリー =================
@@ -149,8 +155,16 @@ function csUseAi_(ai) {
   ai = ai || {};
   var provider = String(ai.provider || '').toLowerCase();
   var key = String(ai.key || '').trim();
+  if (provider === 'ollama') {
+    var url = csOllamaBase_(ai.url);
+    if (!/^https:\/\//i.test(url)) throw new Error('Ollama の URL は https で公開したもの(ngrok など)を入れてください。GAS は Google のサーバーで動くので、http://localhost や LAN の IP には届きません');
+    var model = String(ai.model || '').trim();
+    if (!model) throw new Error('Ollama のモデル名が空です。変換管理の「要約AI」で選んでください');
+    CS_AI = { provider: 'ollama', model: model, key: key, url: url, ctx: Math.max(2048, Number(ai.ctx) || CS_OLLAMA_CTX) };
+    return CS_AI;
+  }
   if (provider && key) {
-    if (!CS_DEFAULT_MODEL[provider]) throw new Error('対応していない AI です: ' + provider);
+    if (!(provider in CS_DEFAULT_MODEL)) throw new Error('対応していない AI です: ' + provider);
     CS_AI = { provider: provider, model: String(ai.model || '').trim() || CS_DEFAULT_MODEL[provider], key: key };
     return CS_AI;
   }
@@ -170,12 +184,17 @@ function csContextHint_() {
 
 function csTail_(instructions) { return '\n\n----------------\n\n' + instructions + '\n' + CS_NO_FENCE; }
 
-function csAsk_(user) {
+function csAsk_(user, sys) {
   var ai = CS_AI || csUseAi_(null);
   var name = CS_PROVIDER_NAME[ai.provider];
-  var system = '日本語で回答してください。';
+  var system = sys || '日本語で回答してください。';
   var req;
-  if (ai.provider === 'anthropic') {
+  if (ai.provider === 'ollama') {
+    req = { url: ai.url + '/api/chat', headers: csOllamaHeaders_(ai),
+      body: { model: ai.model, stream: false, format: 'json', keep_alive: '10m',
+        options: { temperature: 0.3, num_ctx: ai.ctx },
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }] } };
+  } else if (ai.provider === 'anthropic') {
     req = { url: CS_ANTHROPIC_ENDPOINT,
       headers: { 'x-api-key': ai.key, 'anthropic-version': '2023-06-01' },
       body: { model: ai.model, max_tokens: 8192, system: system + CS_NO_FENCE, messages: [{ role: 'user', content: user }] } };
@@ -188,12 +207,18 @@ function csAsk_(user) {
   }
   var tries429 = 0, tries5xx = 0;
   for (;;) {
-    var res = UrlFetchApp.fetch(req.url, {
-      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-      headers: req.headers, payload: JSON.stringify(req.body),
-    });
+    var res;
+    try {
+      res = UrlFetchApp.fetch(req.url, {
+        method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        headers: req.headers, payload: JSON.stringify(req.body),
+      });
+    } catch (e) {
+      throw new Error(name + '(' + (ai.url || req.url) + ')につながりません: ' + (e && e.message || e));
+    }
     var code = res.getResponseCode();
     var text = res.getContentText();
+    if (ai.provider === 'ollama') csOllamaCheck_(ai, code, text);
     if (code === 200) {
       var content = csContent_(ai.provider, JSON.parse(text));
       if (!String(content || '').trim()) throw new Error(name + ' から応答がありませんでした');
@@ -216,10 +241,53 @@ function csAsk_(user) {
 
 /** 応答から本文を取り出す(Claude は content[] の text、ほかは choices[0].message.content) */
 function csContent_(provider, json) {
+  if (provider === 'ollama') return json.message && json.message.content;
   if (provider === 'anthropic') {
     return (json.content || []).filter(function (c) { return c.type === 'text'; }).map(function (c) { return c.text; }).join('');
   }
   return json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
+}
+
+// ---------- Ollama ----------
+function csOllamaBase_(u) { return String(u || '').trim().replace(/\/+$/, '').replace(/\/(api|v1)$/, ''); }
+
+/** ngrok の無料版は確認ページをはさむので、印を付けて飛ばす(旧画面 llm-client.js と同じ) */
+function csOllamaHeaders_(ai) {
+  var h = { 'ngrok-skip-browser-warning': 'true' };
+  if (ai.key) h.Authorization = 'Bearer ' + ai.key;
+  return h;
+}
+
+/** トンネルや Ollama の失敗を、直し方の分かる言葉にする(200 なら何もしない) */
+function csOllamaCheck_(ai, code, text) {
+  if (code === 200 && /^\s*</.test(text)) throw new Error('Ollama ではなく、確認ページなどの HTML が返りました。URL を確かめてください');
+  if (code === 200) return;
+  if (/ERR_NGROK|ngrok/i.test(text) && code >= 400) throw new Error('Ollama(' + ai.url + ')につながりません。ngrok のトンネルが止まっているか、URL が変わっています(HTTP ' + code + ')');
+  if (code === 404 && /model/i.test(text)) throw new Error('Ollama にモデル「' + ai.model + '」がありません。Ollama の機械で ollama pull ' + ai.model + ' を実行するか、「要約AI」でモデルを選び直してください');
+  if (code === 401 || code === 403) throw new Error('Ollama に断られました(HTTP ' + code + ')。トンネルの鍵(API キー)を確かめてください');
+  if (code === 502 || code === 503 || code === 504) throw new Error('Ollama(' + ai.url + ')につながりません。Mac の Ollama が起動しているか確かめてください(HTTP ' + code + ')');
+}
+
+/** 1回だけ AI に聞く(画面が段ごとに呼ぶ。Ollama のように遅い AI 用) */
+function csAiChat_(ai, system, user) {
+  csUseAi_(ai);
+  if (!String(user || '').trim()) throw new Error('問いが空です');
+  return { content: csAsk_(String(user), system ? String(system) : ''), model: CS_AI.model };
+}
+
+/** Ollama に入っているモデルの一覧 */
+function csAiModels_(ai) {
+  var a = Object.assign({}, ai || {}, { model: (ai && ai.model) || '-' });
+  csUseAi_(a);
+  if (CS_AI.provider !== 'ollama') return { models: [] };
+  var res;
+  try { res = UrlFetchApp.fetch(CS_AI.url + '/api/tags', { muteHttpExceptions: true, headers: csOllamaHeaders_(CS_AI) }); }
+  catch (e) { throw new Error('Ollama(' + CS_AI.url + ')につながりません: ' + e.message); }
+  var code = res.getResponseCode(), text = res.getContentText();
+  csOllamaCheck_(CS_AI, code, text);
+  var j;
+  try { j = JSON.parse(text); } catch (e) { throw new Error('Ollama ではない応答が返りました。URL を確かめてください: ' + text.slice(0, 120)); }
+  return { models: (j.models || []).map(function (m) { return m.name; }).filter(String) };
 }
 
 function csJson_(text) {
@@ -406,7 +474,7 @@ function csSelfTest() {
   lines.push('プロパティ GEMINI_API_KEY: ' + (p.getProperty('GEMINI_API_KEY') ? 'あり' : 'なし(ClipStock の「要約AI」で設定していれば不要)'));
   lines.push('プロパティ WEB_NOTION_TOKEN / WEB_DB_ID: ' + (p.getProperty('WEB_NOTION_TOKEN') ? 'あり' : 'なし(web記事を使わなければ不要)') + ' / ' + (p.getProperty('WEB_DB_ID') ? 'あり' : 'なし'));
   [['doPost', typeof doPost], ['saveField_', typeof saveField_], ['saveMemo_', typeof saveMemo_], ['fetchDetail_', typeof fetchDetail_],
-   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_], ['csTestAi_', typeof csTestAi_], ['csAiPlan_', typeof csAiPlan_]]
+   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_], ['csTestAi_', typeof csTestAi_], ['csAiPlan_', typeof csAiPlan_], ['csAiChat_', typeof csAiChat_], ['csAiModels_', typeof csAiModels_]]
     .forEach(function (x) { lines.push('関数 ' + x[0] + ': ' + (x[1] === 'function' ? 'OK' : '★見つかりません(貼り付けが足りない)')); });
   if (typeof doPost === 'function') {
     var body = { action: 'importSummary', token: p.getProperty('ACCESS_TOKEN'), pageId: '', json: '', source: 'video' };
@@ -431,6 +499,8 @@ function doGet() {
     importSummary: typeof csImportSummary_ === 'function',
     testAi: typeof csTestAi_ === 'function',
     aiPlan: typeof csAiPlan_ === 'function',
+    aiChat: typeof csAiChat_ === 'function',
+    aiModels: typeof csAiModels_ === 'function',
     saveField: typeof saveField_ === 'function',
     hasAccessToken: !!p.getProperty('ACCESS_TOKEN'),
     hasNotionToken: !!p.getProperty('NOTION_TOKEN'),

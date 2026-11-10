@@ -139,6 +139,12 @@ function doPost(e) {
       case 'aiPlan':
         result = csAiPlan_(body.pageId, body.source, body.limit);
         break;
+      case 'aiChat':
+        result = csAiChat_(body.ai, body.system, body.user);
+        break;
+      case 'aiModels':
+        result = csAiModels_(body.ai);
+        break;
       case 'importSummary':
         result = csImportSummary_(body.pageId, body.json, body.source, body.model);
         break;
