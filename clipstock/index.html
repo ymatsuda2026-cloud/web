@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com https://script.google.com https://script.googleusercontent.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; img-src data: blob: 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com https://script.google.com https://script.googleusercontent.com https://*.ngrok-free.dev https://*.ngrok-free.app https://*.ngrok.dev https://*.ngrok.app https://*.ngrok.io https://*.trycloudflare.com http://localhost:* http://127.0.0.1:*; frame-src https://www.youtube-nocookie.com https://www.youtube.com; img-src data: blob: 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <title>ClipStock</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.ico" sizes="32x32">
@@ -1217,8 +1217,15 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
   }
   /* ---------- Ollama(ブラウザから直接呼ぶ。GAS からは手元の Ollama に届かない) ---------- */
   const ollamaBase = u => String(u || OLLAMA_URL).trim().replace(/\/+$/, "").replace(/\/(api|v1)$/, "");
+  // この画面が通信を許可している先(index.html の CSP の connect-src)。ここに無い先は、ブラウザが送る前に止める
+  let cspBlocked = "";
+  document.addEventListener("securitypolicyviolation", e => { if (e.violatedDirective?.startsWith("connect-src")) cspBlocked = e.blockedURI || ""; });
   function ollamaNetError(ai) {
     const base = ollamaBase(ai.url);
+    if (cspBlocked && cspBlocked.startsWith(new URL(base).origin)) {
+      cspBlocked = "";
+      return new Error(`この URL（${base}）は、ClipStock が通信を許可している先に入っていません。\n使えるのは、ngrok（*.ngrok-free.dev・*.ngrok-free.app・*.ngrok.app など）、Cloudflare のトンネル（*.trycloudflare.com）、http://localhost・127.0.0.1 です。\nほかの先を使うときは、index.html 先頭の Content-Security-Policy の connect-src に足してください。`);
+    }
     const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(base);
     const mixed = location.protocol === "https:" && /^http:/i.test(base) && !local;
     const lines = [`Ollama（${base}）につながりませんでした。`];
