@@ -1218,7 +1218,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
     return m;
   }
   /* ---------- Ollama(窓口 GAS から呼ぶ。手元のモデルは遅いので、段ごとに分けて頼む) ---------- */
-  const ollamaBase = u => String(u || "").trim().replace(/\/+$/, "").replace(/\/(api|v1)$/, "");
+  const ollamaBase = u => String(u || "").trim().replace(/\/+$/, "");   // /v1 の付け足しは GAS 側でそろえる
   const ollamaModels = async ai => (await gas("aiModels", { ai: aiPayload({ ...ai, model: ai.model || "-" }) }, { waits: [400] })).models || [];
   async function ollamaAsk(ai, system, user) {
     const r = await gas("aiChat", { ai: aiPayload(ai), system, user }, { waits: [400] });
@@ -1265,6 +1265,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       <label class="f" id="aiCtxRow"><span>読める長さ（トークン・num_ctx）</span><input id="aiCtx" type="number" min="4096" step="4096" inputmode="numeric" placeholder="${OLLAMA_CTX}"></label>
       <label class="f"><span id="aiKeyLab">API キー</span><input id="aiKey" type="password" autocapitalize="off" spellcheck="false" autocomplete="off"></label>
       <p class="recline" id="aiOllamaNote">Ollama も窓口（GAS）から呼びます。GAS は Google のサーバーで動くので、<code>http://localhost</code> には届きません。ngrok などで https にした URL を入れてください（末尾の <code>/v1</code> はあってもなくても構いません。ngrok の確認ページは自動で飛ばします）。
+        旧画面と同じく、OpenAI 互換の窓口（<code>/v1/chat/completions</code>・<code>/v1/models</code>）で呼びます。
         手元のモデルは遅いので、サマリ・マップなどを1段ずつ分けて頼みます（1段の上限は GAS の6分）。「読める長さ」を超える文字起こしは、先頭から入るぶんだけ渡します。大きくすると、Mac のメモリを多く使います。</p>
       <div class="acts" style="flex-wrap:wrap"><button class="tb main" id="aiSave">保存する</button><button class="tb" id="aiTest">接続を試す</button>${cur ? '<button class="tb" id="aiDel">設定を消す</button>' : ""}</div>
       <div class="msg" id="aiMsg"></div>

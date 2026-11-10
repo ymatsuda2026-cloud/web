@@ -19,7 +19,7 @@
  *   case 'aiModels':      result = csAiModels_(body.ai); break;
  *
  * Ollama も GAS から呼ぶ。GAS は Google のサーバーで動くので、ngrok などで https にした URL が要る
- * (http://localhost は届かない)。手元のモデルは遅く、5段を1回の実行(6分まで)に収めにくいので、
+ * (http://localhost は届かない)。URL は OpenAI 互換の /v1 を使う(/chat/completions・/models)。手元のモデルは遅く、5段を1回の実行(6分まで)に収めにくいので、
  * 段ごとに分けて呼ぶ: aiPlan で文字起こしと指示文を受け取る → 画面が aiChat を段ごとに呼ぶ
  *                   → importSummary で、ここと同じ変換(時刻付け)をして保存する
  *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source); break;
@@ -190,9 +190,10 @@ function csAsk_(user, sys) {
   var system = sys || '日本語で回答してください。';
   var req;
   if (ai.provider === 'ollama') {
-    req = { url: ai.url + '/api/chat', headers: csOllamaHeaders_(ai),
-      body: { model: ai.model, stream: false, format: 'json', keep_alive: '10m',
-        options: { temperature: 0.3, num_ctx: ai.ctx },
+    // OpenAI 互換の窓口(/v1/chat/completions)で呼ぶ。旧画面 llm-client.js と同じで、Ollama 以外の
+    // 互換サーバー(ngrok の先が /v1 しか持たない場合など)でも通る。num_ctx は Ollama 独自で、旧画面と同じく足す
+    req = { url: ai.url + '/chat/completions', headers: csOllamaHeaders_(ai),
+      body: { model: ai.model, stream: false, temperature: 0.3, num_ctx: ai.ctx,
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }] } };
   } else if (ai.provider === 'anthropic') {
     req = { url: CS_ANTHROPIC_ENDPOINT,
@@ -241,7 +242,6 @@ function csAsk_(user, sys) {
 
 /** 応答から本文を取り出す(Claude は content[] の text、ほかは choices[0].message.content) */
 function csContent_(provider, json) {
-  if (provider === 'ollama') return json.message && json.message.content;
   if (provider === 'anthropic') {
     return (json.content || []).filter(function (c) { return c.type === 'text'; }).map(function (c) { return c.text; }).join('');
   }
@@ -249,7 +249,11 @@ function csContent_(provider, json) {
 }
 
 // ---------- Ollama ----------
-function csOllamaBase_(u) { return String(u || '').trim().replace(/\/+$/, '').replace(/\/(api|v1)$/, ''); }
+/** 末尾を /v1 にそろえる(「…ngrok-free.dev」「…/v1」「…/api」のどれを入れても同じになる) */
+function csOllamaBase_(u) {
+  var b = String(u || '').trim().replace(/\/+$/, '').replace(/\/(chat\/completions|models)$/, '').replace(/\/api$/, '');
+  return /\/v1$/.test(b) ? b : b + '/v1';
+}
 
 /** ngrok の無料版は確認ページをはさむので、印を付けて飛ばす(旧画面 llm-client.js と同じ) */
 function csOllamaHeaders_(ai) {
@@ -263,7 +267,8 @@ function csOllamaCheck_(ai, code, text) {
   if (code === 200 && /^\s*</.test(text)) throw new Error('Ollama ではなく、確認ページなどの HTML が返りました。URL を確かめてください');
   if (code === 200) return;
   if (/ERR_NGROK|ngrok/i.test(text) && code >= 400) throw new Error('Ollama(' + ai.url + ')につながりません。ngrok のトンネルが止まっているか、URL が変わっています(HTTP ' + code + ')');
-  if (code === 404 && /model/i.test(text)) throw new Error('Ollama にモデル「' + ai.model + '」がありません。Ollama の機械で ollama pull ' + ai.model + ' を実行するか、「要約AI」でモデルを選び直してください');
+  if (code === 404 && /model/i.test(text)) throw new Error('モデル「' + ai.model + '」が見つかりません(大文字・小文字も区別されます)。「要約AI」の「接続を試す」で出る一覧から選び直してください');
+  if (code === 404) throw new Error(ai.url + ' に、OpenAI 互換の窓口(/chat/completions・/models)が見つかりません(HTTP 404)。URL を確かめてください');
   if (code === 401 || code === 403) throw new Error('Ollama に断られました(HTTP ' + code + ')。トンネルの鍵(API キー)を確かめてください');
   if (code === 502 || code === 503 || code === 504) throw new Error('Ollama(' + ai.url + ')につながりません。Mac の Ollama が起動しているか確かめてください(HTTP ' + code + ')');
 }
@@ -281,13 +286,13 @@ function csAiModels_(ai) {
   csUseAi_(a);
   if (CS_AI.provider !== 'ollama') return { models: [] };
   var res;
-  try { res = UrlFetchApp.fetch(CS_AI.url + '/api/tags', { muteHttpExceptions: true, headers: csOllamaHeaders_(CS_AI) }); }
+  try { res = UrlFetchApp.fetch(CS_AI.url + '/models', { muteHttpExceptions: true, headers: csOllamaHeaders_(CS_AI) }); }
   catch (e) { throw new Error('Ollama(' + CS_AI.url + ')につながりません: ' + e.message); }
   var code = res.getResponseCode(), text = res.getContentText();
   csOllamaCheck_(CS_AI, code, text);
   var j;
   try { j = JSON.parse(text); } catch (e) { throw new Error('Ollama ではない応答が返りました。URL を確かめてください: ' + text.slice(0, 120)); }
-  return { models: (j.models || []).map(function (m) { return m.name; }).filter(String) };
+  return { models: (j.data || j.models || []).map(function (m) { return m.id || m.name; }).filter(String) };
 }
 
 function csJson_(text) {
