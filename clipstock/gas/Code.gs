@@ -136,8 +136,11 @@ function doPost(e) {
       case 'testAi':
         result = csTestAi_(body.ai);
         break;
+      case 'aiPlan':
+        result = csAiPlan_(body.pageId, body.source, body.limit);
+        break;
       case 'importSummary':
-        result = csImportSummary_(body.pageId, body.json, body.source);
+        result = csImportSummary_(body.pageId, body.json, body.source, body.model);
         break;
       default:
         throw new Error('unknown action: ' + body.action);

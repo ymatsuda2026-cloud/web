@@ -12,7 +12,12 @@
  * Code.gs の doPost の switch に次の2行を足す(SETUP.md 参照):
  *   case 'summarize':     result = csSummarize_(body.pageId, body.source, body.ai); break;
  *   case 'testAi':        result = csTestAi_(body.ai); break;
- *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source); break;
+ *   case 'aiPlan':        result = csAiPlan_(body.pageId, body.source, body.limit); break;
+ *   case 'importSummary': result = csImportSummary_(body.pageId, body.json, body.source, body.model); break;
+ *
+ * Ollama はブラウザから直接呼ぶ(GAS からは手元の Ollama に届かないため)。
+ * そのときの流れ: aiPlan で文字起こしと指示文を受け取る → ブラウザが Ollama で5段を作る
+ *                → importSummary で、ここと同じ変換(時刻付け)をして保存する
  *
  * (Claude.ai に貼るプロンプトは ClipStock の画面側で作る。ここでは作らない)
  *
@@ -87,8 +92,36 @@ function csTestAi_(ai) {
   return { ok: !!p.ok, provider: CS_AI.provider, model: CS_AI.model, fromScript: !!CS_AI.fromScript };
 }
 
-/** Claude.ai が返したJSONを取り込んで保存する */
-function csImportSummary_(pageId, jsonText, source) {
+/**
+ * ブラウザ側の AI(Ollama)で要約するための材料を返す。Notion には書かない。
+ * limit: 文字起こしを渡す上限(文字)。手元のモデルは読める長さが短いので、ブラウザが決める
+ */
+function csAiPlan_(pageId, source, limit) {
+  var detail = csDetail_(pageId, source);
+  var transcript = String(csTranscript_(pageId, source) || '');
+  if (transcript.replace(/\s/g, '').length < 50) throw new Error('文字起こしがありません(または短すぎます)');
+  var max = Math.min(CS_TRANSCRIPT_LIMIT, Math.max(2000, Number(limit) || CS_TRANSCRIPT_LIMIT));
+  var text = transcript.slice(0, max);
+  var timed = csHasTimecodes_(text);
+  return {
+    title: detail.title,
+    input: '動画タイトル: ' + detail.title + '\n\n' + text,
+    rawCount: transcript.length,
+    truncated: transcript.length > max,
+    tails: {
+      summary: csTail_(CS_P.summary),
+      mindmap: csTail_(CS_P.mindmap + (timed ? CS_MINDMAP_QUOTE : '')),
+      fields: csTail_(CS_P.fields + (timed ? CS_FIELDS_QUOTE : CS_FIELDS_PLAIN)),
+      apply: csTail_(CS_P.apply + csContextHint_()),
+      ideas: csTail_(CS_P.ideas),
+    },
+    system: '日本語で回答してください。',
+  };
+}
+
+/** Claude.ai(またはブラウザ側の AI)が返したJSONを取り込んで保存する。model は保存する作成元の名前 */
+function csImportSummary_(pageId, jsonText, source, model) {
+  var by = String(model || '').trim().slice(0, 80) || 'Claude.ai';
   var parsed = csJson_(String(jsonText || ''));
   var transcript = String(csTranscript_(pageId, source) || '');
   var timed = csHasTimecodes_(transcript);
@@ -100,8 +133,8 @@ function csImportSummary_(pageId, jsonText, source) {
   if (parsed.fields) out.fields = csFieldsToText_(parsed.fields, segments);
   if (parsed.apply) out.apply = csApplyToText_(parsed.apply);
   if (parsed.ideas) out.ideas = csIdeasToText_(parsed.ideas);
-  saveGenerated_(pageId, out, 'Claude.ai', transcript.length, source);
-  return { detail: out, model: 'Claude.ai', rawCount: transcript.length, failed: [], generatedAt: new Date().toISOString() };
+  saveGenerated_(pageId, out, by, transcript.length, source);
+  return { detail: out, model: by, rawCount: transcript.length, failed: [], generatedAt: new Date().toISOString() };
 }
 
 // ================= Notion 読み出し =================
@@ -373,7 +406,7 @@ function csSelfTest() {
   lines.push('プロパティ GEMINI_API_KEY: ' + (p.getProperty('GEMINI_API_KEY') ? 'あり' : 'なし(ClipStock の「要約AI」で設定していれば不要)'));
   lines.push('プロパティ WEB_NOTION_TOKEN / WEB_DB_ID: ' + (p.getProperty('WEB_NOTION_TOKEN') ? 'あり' : 'なし(web記事を使わなければ不要)') + ' / ' + (p.getProperty('WEB_DB_ID') ? 'あり' : 'なし'));
   [['doPost', typeof doPost], ['saveField_', typeof saveField_], ['saveMemo_', typeof saveMemo_], ['fetchDetail_', typeof fetchDetail_],
-   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_], ['csTestAi_', typeof csTestAi_]]
+   ['fetchTranscript_', typeof fetchTranscript_], ['saveGenerated_', typeof saveGenerated_], ['csSummarize_', typeof csSummarize_], ['csImportSummary_', typeof csImportSummary_], ['csTestAi_', typeof csTestAi_], ['csAiPlan_', typeof csAiPlan_]]
     .forEach(function (x) { lines.push('関数 ' + x[0] + ': ' + (x[1] === 'function' ? 'OK' : '★見つかりません(貼り付けが足りない)')); });
   if (typeof doPost === 'function') {
     var body = { action: 'importSummary', token: p.getProperty('ACCESS_TOKEN'), pageId: '', json: '', source: 'video' };
@@ -397,6 +430,7 @@ function doGet() {
     summarize: typeof csSummarize_ === 'function',
     importSummary: typeof csImportSummary_ === 'function',
     testAi: typeof csTestAi_ === 'function',
+    aiPlan: typeof csAiPlan_ === 'function',
     saveField: typeof saveField_ === 'function',
     hasAccessToken: !!p.getProperty('ACCESS_TOKEN'),
     hasNotionToken: !!p.getProperty('NOTION_TOKEN'),

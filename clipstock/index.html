@@ -1178,12 +1178,16 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       const x = targets[i]; S.run[x.id] = "run"; drawManage();
       $("#mnote").textContent = `要約中 ${i + 1}/${targets.length}（${aiLabel(ai)}）：${x.t}\n（1本あたり1〜3分ほどかかります。このまま開いておいてください）`;
       try {
-        const r = await gas("summarize", { pageId: x.id, source: x.src, ai: aiPayload(ai) }, { waits: [400, 1500] });
+        const head = `要約中 ${i + 1}/${targets.length}（${aiLabel(ai)}）：${x.t}`;
+        const r = ai && ai.provider === "ollama"
+          ? await ollamaSummarize(x, ai, step => { $("#mnote").textContent = `${head}\n作成中：${step}（手元のモデルは時間がかかります。このまま開いておいてください）`; })
+          : await gas("summarize", { pageId: x.id, source: x.src, ai: aiPayload(ai) }, { waits: [400, 1500] });
+        if (r.truncated) bad.push(`${x.t}（文字起こしが長いため、先頭から一部だけで要約しました。「要約AI」の「読める長さ」を増やすと、より多く渡せます）`);
         applySummary(x.id, r); S.bundles.delete(x.id); delete S.run[x.id]; S.sel.delete(x.id); ok++;
         if (r.failed?.length) bad.push(`${x.t}（${r.failed.join("・")} は作れませんでした）`);
       } catch (e) {
         S.run[x.id] = "err"; const m = aiError(e.message, ai); bad.push(`${x.t}：${m}`);
-        if (/^AI_NOT_SET|GEMINI_API_KEY/.test(e.message)) {                // 設定が無い・GAS が古い: 残りも同じ理由で失敗するので止める
+        if (/^AI_NOT_SET|GEMINI_API_KEY|^Ollama（|unknown action/.test(e.message)) {                // 設定が無い・GAS が古い: 残りも同じ理由で失敗するので止める
           targets.slice(i + 1).forEach(y => delete S.run[y.id]); drawAll(); break;
         }
       }
@@ -1197,34 +1201,104 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
     anthropic: { name: "Claude", model: "claude-sonnet-5-5", models: ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"], key: "sk-ant-…", where: "console.anthropic.com の API Keys" },
     gemini: { name: "Gemini", model: "gemini-2.5-flash", models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"], key: "AIza…", where: "Google AI Studio の API キー" },
     openai: { name: "OpenAI", model: "gpt-5-mini", models: ["gpt-5-mini", "gpt-5", "gpt-4.1-mini"], key: "sk-…", where: "platform.openai.com の API keys" },
+    ollama: { name: "Ollama", model: "", models: [], key: "（なくて構いません）", where: "", local: true },
   };
-  const aiCfg = () => { const v = RS.misc.ai?.v; return v && AI_LIST[v.provider] && v.key ? v : null; };
-  const aiPayload = ai => ai ? { provider: ai.provider, model: ai.model || AI_LIST[ai.provider].model, key: ai.key } : null;
+  const OLLAMA_URL = "http://localhost:11434", OLLAMA_CTX = 16384;
+  const aiCfg = () => { const v = RS.misc.ai?.v; return v && AI_LIST[v.provider] && (v.provider === "ollama" ? v.url && v.model : v.key) ? v : null; };
+  const aiPayload = ai => ai && !AI_LIST[ai.provider].local ? { provider: ai.provider, model: ai.model || AI_LIST[ai.provider].model, key: ai.key } : null;
   const aiLabel = ai => ai ? `${AI_LIST[ai.provider].name}・${ai.model || AI_LIST[ai.provider].model}` : "GAS の Gemini";
   function aiError(m, ai) {
+    if (ai?.provider === "ollama" && /Summarize\.gs|unknown action/i.test(m)) return "要約の窓口（GAS）が古いままです。新しい Summarize.gs と Code.gs を貼り、「新バージョン」でデプロイし直してください。";
     if (/^AI_NOT_SET/.test(m)) return "要約AIが設定されていません。「要約AI」で、AI と API キーを設定してください。";
     if (/GEMINI_API_KEY/.test(m)) return ai
       ? "要約の窓口（GAS）が古いままで、設定した AI を使えません。新しい Summarize.gs と Code.gs を貼り、「新バージョン」でデプロイし直してください。"
       : "要約AIが設定されていません。「要約AI」で、AI と API キーを設定してください。";
     return m;
   }
+  /* ---------- Ollama(ブラウザから直接呼ぶ。GAS からは手元の Ollama に届かない) ---------- */
+  const ollamaBase = u => String(u || OLLAMA_URL).trim().replace(/\/+$/, "").replace(/\/(api|v1)$/, "");
+  function ollamaNetError(ai) {
+    const base = ollamaBase(ai.url);
+    const mixed = location.protocol === "https:" && /^http:/i.test(base) && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(base);
+    return new Error(`Ollama（${base}）につながりませんでした。\n`
+      + (mixed ? "・https のページからは、http の別の機械（LAN の IP など）へはつなげません。Ollama を動かしている機械で開くか（http://localhost:11434）、https で公開した URL を使ってください。\n" : "")
+      + "・Ollama が起動しているか\n"
+      + `・Ollama の環境変数 OLLAMA_ORIGINS に ${location.origin} を入れて、Ollama を起動し直したか\n`
+      + "・Safari は、https のページから http://localhost への接続を止めることがあります（Chrome・Edge で試してください）");
+  }
+  async function ollamaFetch(ai, path, body) {
+    const h = { "Content-Type": "application/json" }; if (ai.key) h.Authorization = "Bearer " + ai.key;
+    let r;
+    try { r = await fetch(ollamaBase(ai.url) + path, body ? { method: "POST", headers: h, body: JSON.stringify(body) } : { headers: ai.key ? { Authorization: h.Authorization } : {} }); }
+    catch { throw ollamaNetError(ai); }
+    const t = await r.text();
+    if (r.status === 404 && body) throw new Error(`Ollama にモデル「${ai.model}」がありません。Ollama を動かしている機械で ollama pull ${ai.model} を実行してください。`);
+    if (r.status === 401 || r.status === 403) throw new Error(`Ollama に断られました（HTTP ${r.status}）。OLLAMA_ORIGINS か、API キーを確かめてください。`);
+    if (!r.ok) throw new Error(`Ollama HTTP ${r.status}: ${t.slice(0, 200)}`);
+    try { return JSON.parse(t); } catch { throw new Error("Ollama の応答を読めませんでした。"); }
+  }
+  const ollamaModels = async ai => ((await ollamaFetch(ai, "/api/tags")).models || []).map(m => m.name).filter(Boolean);
+  async function ollamaAsk(ai, system, user) {
+    const j = await ollamaFetch(ai, "/api/chat", { model: ai.model, stream: false, format: "json", keep_alive: "10m",
+      options: { temperature: 0.3, num_ctx: Number(ai.ctx) || OLLAMA_CTX },
+      messages: [{ role: "system", content: system }, { role: "user", content: user }] });
+    const c = j.message?.content || "";
+    if (!c.trim()) throw new Error("Ollama から応答がありませんでした。");
+    return c;
+  }
+  const pickJson = t => { const a = t.indexOf("{"), b = t.lastIndexOf("}"); if (a < 0 || b < 0) throw new Error("応答からJSONを取り出せませんでした"); return JSON.parse(t.slice(a, b + 1)); };
+  // 文字起こしを渡す上限(文字)。日本語はおよそ1トークン1字強。指示文と答えの分を残す
+  const ollamaLimit = ai => Math.max(3000, Math.floor((Number(ai.ctx) || OLLAMA_CTX) * 1.1) - 5000);
+  /** Ollama で5段を作り、窓口(GAS)の取り込みで保存する(時刻付けは GAS 側で、ほかの AI と同じ) */
+  async function ollamaSummarize(x, ai, say) {
+    const plan = await gas("aiPlan", { pageId: x.id, source: x.src, limit: ollamaLimit(ai) }, { waits: [400, 1500] });
+    const parts = {}, failed = [];
+    say("サマリ");
+    parts.summary = String(pickJson(await ollamaAsk(ai, plan.system, plan.input + plan.tails.summary)).summary || "").trim();
+    if (!parts.summary) throw new Error("サマリを作れませんでした。");
+    const steps = [["mindmap", "マップ", () => plan.input + plan.tails.mindmap, p => p],
+                   ["fields", "分野別", () => plan.input + plan.tails.fields, p => p.fields]];
+    for (const [k, lab, prompt, take] of steps) {
+      say(lab);
+      try { const v = take(pickJson(await ollamaAsk(ai, plan.system, prompt()))); if (v) parts[k] = v; else failed.push(k); } catch { failed.push(k); }
+    }
+    // 応用・活用は、サマリと分野別をもとに作る(GAS の csApplyContext_ と同じ形)
+    const fieldsText = (Array.isArray(parts.fields) ? parts.fields : []).map(f => [`## ${f?.name || ""}`, f?.summary || "", ...(f?.points || []).map(p => "- " + (typeof p === "string" ? p : p?.text || ""))].join("\n")).join("\n\n");
+    const ctx = ["動画タイトル: " + plan.title, "", "# サマリ", parts.summary, "", "# 分野別要約", fieldsText].join("\n").slice(0, 8000);
+    for (const [k, lab] of [["apply", "応用"], ["ideas", "活用"]]) {
+      say(lab);
+      try { const v = pickJson(await ollamaAsk(ai, plan.system, ctx + plan.tails[k]))[k]; if (v) parts[k] = v; else failed.push(k); } catch { failed.push(k); }
+    }
+    say("保存");
+    const r = await gas("importSummary", { pageId: x.id, source: x.src, json: JSON.stringify(parts), model: "Ollama・" + ai.model }, { waits: [400, 1500] });
+    return { ...r, failed: [...(r.failed || []), ...failed], truncated: plan.truncated, rawCount: plan.rawCount };
+  }
   function drawAiBtn() { const ai = aiCfg(); $("#mAiSet").textContent = ai ? `要約AI：${AI_LIST[ai.provider].name}` : "要約AI：未設定"; }
   function aiDialog() {
     const cur = RS.misc.ai?.v || null;
     const prov = cur && AI_LIST[cur.provider] ? cur.provider : "anthropic";
     const opt = Object.entries(AI_LIST).map(([k, v]) => `<option value="${k}" ${k === prov ? "selected" : ""}>${v.name}</option>`).join("");
-    popOpen("要約AI", `<p>「選択を要約する」で使う AI です。ここで設定した AI で、サマリ・マップ・分野別・応用・活用を作ります。</p>
+    popOpen("要約AI", `<p>「選択を要約する」で使う AI です。ここで設定した AI で、サマリ・マップ・分野別・応用・活用を作ります。Claude・Gemini・OpenAI は窓口（GAS）から、Ollama はこの画面から呼びます。</p>
       <label class="f"><span>AI</span><select id="aiProv">${opt}</select></label>
+      <label class="f" id="aiUrlRow"><span>Ollama の URL</span><input id="aiUrl" type="url" autocapitalize="off" spellcheck="false" placeholder="${OLLAMA_URL}"></label>
       <label class="f"><span>モデル</span><input id="aiModel" list="aiModels" autocapitalize="off" spellcheck="false"><datalist id="aiModels"></datalist></label>
-      <label class="f"><span>API キー</span><input id="aiKey" type="password" autocapitalize="off" spellcheck="false" autocomplete="off"></label>
+      <label class="f" id="aiCtxRow"><span>読める長さ（トークン・num_ctx）</span><input id="aiCtx" type="number" min="4096" step="4096" inputmode="numeric" placeholder="${OLLAMA_CTX}"></label>
+      <label class="f"><span id="aiKeyLab">API キー</span><input id="aiKey" type="password" autocapitalize="off" spellcheck="false" autocomplete="off"></label>
+      <p class="recline" id="aiOllamaNote">Ollama は、この画面（ブラウザ）から直接呼びます。Ollama を動かしている機械で ClipStock を開くか、https で公開した URL を入れてください。
+        はじめに、Ollama の環境変数 <code>OLLAMA_ORIGINS</code> に <code>${location.origin}</code> を入れて、Ollama を起動し直してください（Mac なら <code>launchctl setenv OLLAMA_ORIGINS "${location.origin}"</code> のあと、Ollama を終了して開き直す）。
+        「読める長さ」を超える文字起こしは、先頭から入るぶんだけ渡します。大きくすると、メモリを多く使います。</p>
       <div class="acts" style="flex-wrap:wrap"><button class="tb main" id="aiSave">保存する</button><button class="tb" id="aiTest">接続を試す</button>${cur ? '<button class="tb" id="aiDel">設定を消す</button>' : ""}</div>
       <div class="msg" id="aiMsg"></div>
       <p class="recline">API キーは、暗号化して記録に保存し、ほかの端末でも使います。要約を頼むたびに窓口（GAS）へ送りますが、GAS には保存しません。利用料は、そのキーの契約にかかります。<br>未設定のときは、GAS のスクリプトプロパティ（GEMINI_API_KEY）の Gemini を使います。</p>`, () => {
       const fill = (keepModel) => {
-        const p = $("#aiProv").value, d = AI_LIST[p], same = cur && cur.provider === p;
+        const p = $("#aiProv").value, d = AI_LIST[p], same = cur && cur.provider === p, loc = !!d.local;
+        $("#aiUrlRow").hidden = $("#aiCtxRow").hidden = $("#aiOllamaNote").hidden = !loc;
+        $("#aiKeyLab").textContent = loc ? "API キー（https で公開して鍵をかけたときだけ）" : "API キー";
+        $("#aiUrl").value = same && cur.url ? cur.url : OLLAMA_URL;
+        $("#aiCtx").value = same && cur.ctx ? cur.ctx : OLLAMA_CTX;
         $("#aiModels").innerHTML = d.models.map(m => `<option value="${m}">`).join("");
         if (!keepModel) $("#aiModel").value = same ? (cur.model || d.model) : d.model;
-        $("#aiModel").placeholder = d.model;
+        $("#aiModel").placeholder = loc ? "例：qwen3:14b（「接続を試す」で一覧が出ます）" : d.model;
         $("#aiKey").value = ""; $("#aiKey").placeholder = same && cur.key ? "保存済み（変えるときだけ入力）" : d.key;
         $("#aiMsg").textContent = ""; $("#aiMsg").className = "msg";
         $("#aiMsg").title = d.where;
@@ -1232,18 +1306,34 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       fill(false);
       $("#aiProv").onchange = () => fill(false);
       const read = () => {
-        const p = $("#aiProv").value, key = $("#aiKey").value.trim() || (cur && cur.provider === p ? cur.key : "");
-        return { provider: p, model: $("#aiModel").value.trim() || AI_LIST[p].model, key };
+        const p = $("#aiProv").value, key = $("#aiKey").value.trim() || (cur && cur.provider === p ? cur.key || "" : "");
+        const v = { provider: p, model: $("#aiModel").value.trim() || AI_LIST[p].model, key };
+        if (AI_LIST[p].local) { v.url = ollamaBase($("#aiUrl").value); v.ctx = Math.max(2048, Number($("#aiCtx").value) || OLLAMA_CTX); }
+        return v;
       };
       const say = (t, ok) => { $("#aiMsg").textContent = t; $("#aiMsg").className = "msg" + (ok ? " ok" : ""); };
       $("#aiSave").onclick = () => {
         const v = read();
-        if (!v.key) { say(`API キーを入れてください（${AI_LIST[v.provider].where}で作れます）。`); return; }
+        if (v.provider === "ollama") { if (!v.model) { say("モデル名を入れてください（「接続を試す」で、入っているモデルの一覧が出ます）。"); return; } }
+        else if (!v.key) { say(`API キーを入れてください（${AI_LIST[v.provider].where}で作れます）。`); return; }
         RS.misc.ai = { v, at: Date.now() }; saveRS(true); drawAiBtn(); popClose();
         $("#mnote").textContent = `要約AIを ${aiLabel(v)} にしました。「選択を要約する」で使います。`;
       };
       $("#aiTest").onclick = async () => {
         const v = read();
+        if (v.provider === "ollama") {                    // GAS を通さず、ブラウザから直接確かめる
+          $("#aiTest").disabled = true; say("確かめています…", true);
+          try {
+            const names = await ollamaModels(v);
+            $("#aiModels").innerHTML = names.map(m => `<option value="${esc(m)}">`).join("");
+            if (!names.length) say("つながりましたが、モデルが入っていません。ollama pull <モデル名> で入れてください。");
+            else if (!v.model) say(`つながりました。入っているモデル：${names.join("、")}。モデル欄で選んでください。`, true);
+            else if (!names.some(n => n === v.model || n === v.model + ":latest")) say(`つながりましたが、「${v.model}」は入っていません。入っているモデル：${names.join("、")}`);
+            else { say("モデルに短い問いを送っています（初回は読み込みに時間がかかります）…", true); const p = pickJson(await ollamaAsk(v, "日本語で回答してください。", '次のJSONをそのまま返してください: {"ok": true}')); say(p.ok ? `つながりました（${aiLabel(v)}）。保存すると使えます。` : "応答はありましたが、形が想定と違いました。", !!p.ok); }
+          } catch (e) { say(e.message); }
+          finally { if ($("#aiTest")) $("#aiTest").disabled = false; }
+          return;
+        }
         if (!v.key) { say("API キーを入れてください。"); return; }
         if (!secret.gas) { say("要約の窓口（GAS）が未登録です。"); return; }
         $("#aiTest").disabled = true; say("確かめています…", true);
