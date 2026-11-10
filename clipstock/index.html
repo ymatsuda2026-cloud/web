@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com https://script.google.com https://script.googleusercontent.com; frame-src https://www.youtube-nocookie.com https://www.youtube.com; img-src data: blob: 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self' https://cdn.jsdelivr.net; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.github.com https://script.google.com https://script.googleusercontent.com https://*.ngrok-free.dev https://*.ngrok-free.app https://*.ngrok.dev https://*.ngrok.app https://*.ngrok.io https://*.trycloudflare.com http://localhost:* http://127.0.0.1:*; frame-src https://www.youtube-nocookie.com https://www.youtube.com; img-src data: blob: 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <title>ClipStock</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.ico" sizes="32x32">
@@ -1217,12 +1217,44 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       : "要約AIが設定されていません。「要約AI」で、AI と API キーを設定してください。";
     return m;
   }
-  /* ---------- Ollama(窓口 GAS から呼ぶ。手元のモデルは遅いので、段ごとに分けて頼む) ---------- */
-  const ollamaBase = u => String(u || "").trim().replace(/\/+$/, "");   // /v1 の付け足しは GAS 側でそろえる
-  const ollamaModels = async ai => (await gas("aiModels", { ai: aiPayload({ ...ai, model: ai.model || "-" }) }, { waits: [400] })).models || [];
+  /* ---------- Ollama(議事録アプリ minutes の llm-client.js と同じ: ブラウザから直接、OpenAI 互換の /v1 を呼ぶ)
+     GAS からだと ngrok の先が応答しないため。文字起こしの受け取りと保存だけ GAS(aiPlan・importSummary) ---------- */
+  const ollamaBase = u => String(u || "").trim().replace(/\/+$/, "");
+  const ollamaV1 = u => { const b = ollamaBase(u).replace(/\/(chat\/completions|models)$/, "").replace(/\/api$/, ""); return /\/v1$/.test(b) ? b : b + "/v1"; };
+  let cspBlocked = "";
+  document.addEventListener("securitypolicyviolation", e => { if (String(e.violatedDirective || "").startsWith("connect-src")) cspBlocked = e.blockedURI || ""; });
+  function ollamaNetError(ai) {
+    const base = ollamaV1(ai.url);
+    let origin = ""; try { origin = new URL(base).origin; } catch {}
+    if (cspBlocked && origin && cspBlocked.startsWith(origin)) {
+      cspBlocked = "";
+      return new Error(`この URL（${base}）は、ClipStock が通信を許可している先に入っていません。使えるのは ngrok（*.ngrok-free.dev など）、*.trycloudflare.com、http://localhost です。ほかの先は、index.html 先頭の Content-Security-Policy の connect-src に足してください。`);
+    }
+    return new Error(`Ollama（${base}）につながりませんでした。\n・Mac の Ollama と ngrok が起動しているか（ngrok の URL は、起動し直すと変わることがあります）\n・このサイト（${location.origin}）からの呼び出しを許可しているか（Ollama なら OLLAMA_ORIGINS）`);
+  }
+  function ollamaHeaders(ai, json) {
+    const h = {};
+    if (json) h["Content-Type"] = "application/json";
+    if (ai.key) h.Authorization = "Bearer " + ai.key;
+    if (ollamaBase(ai.url).includes("ngrok")) h["ngrok-skip-browser-warning"] = "true";   // ngrok の確認ページを飛ばす(minutes と同じ)
+    return h;
+  }
+  async function ollamaFetch(ai, path, body) {
+    let r;
+    try { r = await fetch(ollamaV1(ai.url) + path, body ? { method: "POST", headers: ollamaHeaders(ai, true), body: JSON.stringify(body) } : { headers: ollamaHeaders(ai, false) }); }
+    catch { throw ollamaNetError(ai); }
+    const t = await r.text();
+    if (r.status === 404 && body && /model/i.test(t)) throw new Error(`モデル「${ai.model}」が見つかりません（大文字・小文字も区別されます）。「接続を試す」で出る一覧から選び直してください。`);
+    if (r.status === 401 || r.status === 403) throw new Error(`Ollama に断られました（HTTP ${r.status}）。API キーを確かめてください。`);
+    if (!r.ok) throw new Error(`Ollama HTTP ${r.status}: ${t.slice(0, 200) || "(本文なし)"}`);
+    try { return JSON.parse(t); } catch { throw new Error(`Ollama から JSON ではない応答が返りました：${t.slice(0, 160) || "(本文なし)"}`); }
+  }
+  const ollamaModels = async ai => ((await ollamaFetch(ai, "/models")).data || []).map(m => m.id).filter(Boolean);
   async function ollamaAsk(ai, system, user) {
-    const r = await gas("aiChat", { ai: aiPayload(ai), system, user }, { waits: [400] });
-    const c = r?.content || "";
+    const j = await ollamaFetch(ai, "/chat/completions", { model: ai.model, stream: false, temperature: 0.3,
+      num_ctx: Number(ai.ctx) || OLLAMA_CTX,     // Ollama 独自。minutes と同じく足す
+      messages: [{ role: "system", content: system }, { role: "user", content: user }] });
+    const c = j.choices?.[0]?.message?.content || "";
     if (!c.trim()) throw new Error("Ollama から応答がありませんでした。");
     return c;
   }
@@ -1258,15 +1290,14 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
     const cur = RS.misc.ai?.v || null;
     const prov = cur && AI_LIST[cur.provider] ? cur.provider : "anthropic";
     const opt = Object.entries(AI_LIST).map(([k, v]) => `<option value="${k}" ${k === prov ? "selected" : ""}>${v.name}</option>`).join("");
-    popOpen("要約AI", `<p>「選択を要約する」で使う AI です。ここで設定した AI で、サマリ・マップ・分野別・応用・活用を作ります。どの AI も、窓口（GAS）から呼びます。</p>
+    popOpen("要約AI", `<p>「選択を要約する」で使う AI です。ここで設定した AI で、サマリ・マップ・分野別・応用・活用を作ります。Claude・Gemini・OpenAI は窓口（GAS）から、Ollama は議事録アプリと同じく、この画面から直接呼びます。</p>
       <label class="f"><span>AI</span><select id="aiProv">${opt}</select></label>
       <label class="f" id="aiUrlRow"><span>Ollama の URL</span><input id="aiUrl" type="url" autocapitalize="off" spellcheck="false" placeholder="${OLLAMA_URL}"></label>
       <label class="f"><span>モデル</span><input id="aiModel" list="aiModels" autocapitalize="off" spellcheck="false"><datalist id="aiModels"></datalist></label>
       <label class="f" id="aiCtxRow"><span>読める長さ（トークン・num_ctx）</span><input id="aiCtx" type="number" min="4096" step="4096" inputmode="numeric" placeholder="${OLLAMA_CTX}"></label>
       <label class="f"><span id="aiKeyLab">API キー</span><input id="aiKey" type="password" autocapitalize="off" spellcheck="false" autocomplete="off"></label>
-      <p class="recline" id="aiOllamaNote">Ollama も窓口（GAS）から呼びます。GAS は Google のサーバーで動くので、<code>http://localhost</code> には届きません。ngrok などで https にした URL を入れてください（末尾の <code>/v1</code> はあってもなくても構いません。ngrok の確認ページは自動で飛ばします）。
-        旧画面と同じく、OpenAI 互換の窓口（<code>/v1/chat/completions</code>・<code>/v1/models</code>）で呼びます。
-        手元のモデルは遅いので、サマリ・マップなどを1段ずつ分けて頼みます（1段の上限は GAS の6分）。「読める長さ」を超える文字起こしは、先頭から入るぶんだけ渡します。大きくすると、Mac のメモリを多く使います。</p>
+      <p class="recline" id="aiOllamaNote">Ollama は、議事録アプリと同じく、この画面（ブラウザ）から直接、OpenAI 互換の窓口（<code>/v1/models</code>・<code>/v1/chat/completions</code>）を呼びます。URL は議事録アプリと同じもの（末尾の <code>/v1</code> はあってもなくても可）、API キーも同じです。ngrok の確認ページは自動で飛ばします。
+        文字起こしの受け取りと Notion への保存だけ、窓口（GAS）を使います。「読める長さ」を超える文字起こしは、先頭から入るぶんだけ渡します。</p>
       <div class="acts" style="flex-wrap:wrap"><button class="tb main" id="aiSave">保存する</button><button class="tb" id="aiTest">接続を試す</button>${cur ? '<button class="tb" id="aiDel">設定を消す</button>' : ""}</div>
       <div class="msg" id="aiMsg"></div>
       <p class="recline">API キーは、暗号化して記録に保存し、ほかの端末でも使います。要約を頼むたびに窓口（GAS）へ送りますが、GAS には保存しません。利用料は、そのキーの契約にかかります。<br>未設定のときは、GAS のスクリプトプロパティ（GEMINI_API_KEY）の Gemini を使います。</p>`, () => {
@@ -1295,7 +1326,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       const say = (t, ok) => { $("#aiMsg").textContent = t; $("#aiMsg").className = "msg" + (ok ? " ok" : ""); };
       $("#aiSave").onclick = () => {
         const v = read();
-        if (v.provider === "ollama") { if (!/^https:\/\//i.test(v.url)) { say("Ollama の URL は、ngrok などで https にしたものを入れてください（GAS から呼ぶため、http://localhost は届きません）。"); return; } if (!v.model) { say("モデル名を入れてください（「接続を試す」で、入っているモデルの一覧が出ます）。"); return; } }
+        if (v.provider === "ollama") { if (!/^https?:\/\//i.test(v.url)) { say("Ollama の URL を入れてください（例：https://….ngrok-free.dev/v1）。"); return; } if (!v.model) { say("モデル名を入れてください（「接続を試す」で、入っているモデルの一覧が出ます）。"); return; } }
         else if (!v.key) { say(`API キーを入れてください（${AI_LIST[v.provider].where}で作れます）。`); return; }
         RS.misc.ai = { v, at: Date.now() }; saveRS(true); drawAiBtn(); popClose();
         $("#mnote").textContent = `要約AIを ${aiLabel(v)} にしました。「選択を要約する」で使います。`;
@@ -1303,8 +1334,7 @@ body.imm:not(.chrome) .tabbar{transform:translateY(100%)}
       $("#aiTest").onclick = async () => {
         const v = read();
         if (v.provider === "ollama") {                    // 窓口(GAS)から、モデルの一覧 → 短い問い の順に確かめる
-          if (!secret.gas) { say("要約の窓口（GAS）が未登録です。"); return; }
-          if (!/^https:\/\//i.test(v.url)) { say("GAS は Google のサーバーで動くので、http://localhost や LAN の IP には届きません。ngrok などで https にした URL を入れてください。"); return; }
+          if (!/^https?:\/\//i.test(v.url)) { say("Ollama の URL を入れてください（例：https://….ngrok-free.dev/v1）。"); return; }
           $("#aiTest").disabled = true; say("確かめています…", true);
           try {
             const names = await ollamaModels(v);
