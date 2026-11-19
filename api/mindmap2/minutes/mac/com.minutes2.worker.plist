@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- ~/Library/LaunchAgents/ に置いて launchctl load。パスは自分の環境に合わせて書き換える -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.minutes2.worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/あなた/.minutes2/venv/bin/python3</string>
+    <string>/Users/あなた/minutes2/mac/minutes_worker.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/あなた/minutes2/mac</string>
+  <key>StartInterval</key><integer>300</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/tmp/minutes2_worker.out</string>
+  <key>StandardErrorPath</key><string>/tmp/minutes2_worker.err</string>
+</dict>
+</plist>

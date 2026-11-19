@@ -1,0 +1,3 @@
+cryptography>=42
+requests>=2.31
+mlx-whisper>=0.4    # 文字起こし（Apple Silicon の Mac だけ）
