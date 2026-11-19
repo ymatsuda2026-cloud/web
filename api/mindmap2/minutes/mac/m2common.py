@@ -26,7 +26,7 @@ def load_env() -> dict:
             k, v = line.split("=", 1)
             env[k.strip()] = v.strip().strip('"').strip("'")
     for k, v in os.environ.items():
-        if k.startswith(("GH_", "JSONBIN_", "NOTION_", "DRIVE_", "WHISPER_", "MINUTES2_")):
+        if k.startswith(("GH_", "GAS_", "AUDIO_", "NOTION_", "DRIVE_", "WHISPER_", "MINUTES2_")):
             env[k] = v
     return env
 

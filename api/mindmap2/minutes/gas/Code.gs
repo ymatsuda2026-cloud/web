@@ -2,22 +2,24 @@
  * 議事録 v2 — GAS（ログイン・書き込みの窓口）
  *
  * 役割
- *   ・login     : 権限コードを確かめ、その role の「鍵束」（jsonbin、暗号化済み）とセッションを返す
+ *   ・login     : 権限コードを確かめ、その role の「鍵束」（暗号化済み）とセッションを返す
  *   ・initUpload / putChunk : 音声を Drive の受付フォルダへ 3MB ずつ中継（今の minutes と同じ方式）
  *   ・put       : 暗号化済みの議事録を GitHub private リポジトリへ書く（書き込みトークンは GAS だけが持つ）
+ *   ・setup     : Mac の setup_keys.py から、下のスクリプトプロパティをまとめて登録する
  *
  * GAS は中身を復号できない。権限の確認は「どのグループ鍵で包まれているか（index.json の k）」で行う。
  *
- * スクリプトプロパティ（mac/setup_keys.py が値を出力する。ソースには絶対に書かない）
- *   CODE_PEPPER     権限コードの HMAC 用の秘密値
- *   CODE_HASHES     {"HMAC(コード)": "role", ...}  元のコードは保存しない
- *   ROLE_GIDS       {"role": "グループID", ...}
- *   SESSION_SECRET  セッションの署名用の秘密値
- *   JSONBIN_KEY     jsonbin の X-Master-Key
- *   JSONBIN_BIN_ID  鍵束を置いた bin の ID
- *   GH_TOKEN        データ用リポジトリへの書き込みトークン（fine-grained, Contents: Read and write）
- *   GH_OWNER / GH_REPO / GH_BRANCH  データ用リポジトリ
- *   AUDIO_FOLDER_ID 音声の受付フォルダ（Drive）
+ * スクリプトプロパティ
+ *   手で入れるのは SETUP_TOKEN だけ（setup_keys.py が作る長いランダム値。Mac の .env と同じもの）。
+ *   ほかは setup_keys.py が setup で登録する。ソースやコメントには絶対に書かない。
+ *     CODE_PEPPER     権限コードの HMAC 用の秘密値
+ *     CODE_HASHES     {"HMAC(コード)": "role", ...}  元のコードは保存しない
+ *     ROLE_GIDS       {"role": "グループID", ...}
+ *     SESSION_SECRET  セッションの署名用の秘密値
+ *     BUNDLE_<role>   その role の鍵束（権限コードで暗号化した {salt, iv, ct}）
+ *     GH_TOKEN        データ用リポジトリへの書き込みトークン（fine-grained, Contents: Read and write）
+ *     GH_OWNER / GH_REPO / GH_BRANCH  データ用リポジトリ
+ *     AUDIO_FOLDER_ID 音声の受付フォルダ（Drive）
  */
 
 var ADMIN_ROLE = 'xYz';
@@ -36,6 +38,7 @@ function doPost(e) {
       case 'initUpload': data = initUpload_(session_(body.session), body); break;
       case 'putChunk': session_(body.session); data = putChunk_(body); break;
       case 'put': data = put_(session_(body.session), body); break;
+      case 'setup': data = setup_(body); break;
       default: throw new Error('unknown action');
     }
     return out_({ ok: true, data: data });
@@ -79,9 +82,9 @@ function login_(code) {
   var gids = JSON.parse(prop_('ROLE_GIDS'));
   var gid = gids[role];
   if (!gid) throw new Error('この権限のグループ鍵がまだ作られていません（管理者に連絡してください）');
-  var bundles = bundles_();
-  var sealed = bundles[role];
-  if (!sealed) throw new Error('この権限の鍵束が jsonbin にありません（管理者に連絡してください）');
+  var raw = prop_('BUNDLE_' + role, false);
+  if (!raw) throw new Error('この権限の鍵束が登録されていません（管理者に連絡してください）');
+  var sealed = JSON.parse(raw);
 
   var admin = role === ADMIN_ROLE;
   var exp = Date.now() + SESSION_HOURS * 3600 * 1000;
@@ -89,22 +92,6 @@ function login_(code) {
     role: role, admin: admin, gid: gid, adminGid: gids[ADMIN_ROLE],
     bundle: sealed, session: sign_({ r: role, g: gid, a: admin, x: exp }), exp: exp,
   };
-}
-
-/** jsonbin の鍵束（どれも権限コードで暗号化済み）。10分キャッシュ */
-function bundles_() {
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('bundles');
-  if (hit) return JSON.parse(hit);
-  var res = UrlFetchApp.fetch('https://api.jsonbin.io/v3/b/' + prop_('JSONBIN_BIN_ID') + '/latest', {
-    headers: { 'X-Master-Key': prop_('JSONBIN_KEY'), 'X-Bin-Meta': 'false' },
-    muteHttpExceptions: true,
-  });
-  if (res.getResponseCode() !== 200) throw new Error('jsonbin の読み込みに失敗しました (' + res.getResponseCode() + ')');
-  var bundles = JSON.parse(res.getContentText()).bundles || {};
-  var s = JSON.stringify(bundles);
-  if (s.length < 90000) cache.put('bundles', s, 600);
-  return bundles;
 }
 
 function sign_(obj) {
@@ -121,6 +108,54 @@ function session_(token) {
   var s = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString('UTF-8'));
   if (!s.x || s.x < Date.now()) throw new Error('ログインの有効期限が切れました。開き直してください。');
   return { role: s.r, gid: s.g, admin: !!s.a };
+}
+
+// ============ 登録（Mac の setup_keys.py から） ============
+
+var SETUP_KEYS = ['CODE_PEPPER', 'CODE_HASHES', 'ROLE_GIDS', 'SESSION_SECRET', 'GH_TOKEN', 'GH_OWNER', 'GH_REPO', 'GH_BRANCH', 'AUDIO_FOLDER_ID'];
+
+function setupKeyOk_(k) {
+  return SETUP_KEYS.indexOf(k) >= 0 || /^BUNDLE_[A-Za-z0-9_-]{1,40}$/.test(k);
+}
+
+/**
+ * body: { token, set?: {キー: 値}, del?: [キー], check?: true }
+ * token は SETUP_TOKEN と一致したときだけ通す。値は返さない（check はキーの有無だけ返す）
+ */
+function setup_(body) {
+  var cache = CacheService.getScriptCache();
+  var fails = Number(cache.get('setupFails') || 0);
+  if (fails >= 5) throw new Error('登録の失敗が続いたため、しばらく止めています。');
+  var want = prop_('SETUP_TOKEN');
+  var got = String(body.token || '');
+  var a = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, want);
+  var b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, got);
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  if (diff !== 0 || want.length < 32) {
+    cache.put('setupFails', String(fails + 1), FAIL_WINDOW);
+    throw new Error('SETUP_TOKEN が違います');
+  }
+  var props = PropertiesService.getScriptProperties();
+  var set = body.set || {};
+  var keys = Object.keys(set);
+  keys.forEach(function (k) {
+    if (!setupKeyOk_(k)) throw new Error('登録できないキーです: ' + k);
+    if (typeof set[k] !== 'string' || set[k].length > 9000) throw new Error('値が不正です: ' + k);
+  });
+  (body.del || []).forEach(function (k) { if (!setupKeyOk_(k)) throw new Error('消せないキーです: ' + k); });
+  if (keys.length) {
+    var o = {};
+    keys.forEach(function (k) { o[k] = set[k]; });
+    props.setProperties(o, false);
+  }
+  (body.del || []).forEach(function (k) { props.deleteProperty(k); });
+  var all = props.getKeys();
+  return {
+    set: keys,
+    deleted: body.del || [],
+    have: all.filter(function (k) { return setupKeyOk_(k); }).sort(),
+  };
 }
 
 // ============ 音声のアップロード（今の minutes と同じ中継方式） ============

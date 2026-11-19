@@ -4,7 +4,7 @@
 //   ・会議ごとに 32 バイトの鍵（DEK）を作り、タイトル・文字起こし・要約・メモを AES-GCM で暗号化する
 //   ・DEK は「閲覧グループの公開鍵（ECDH P-256）」で包んで index.json の k に並べる
 //       包み方: 使い捨て鍵ペア × グループ公開鍵 で ECDH → HKDF-SHA256（salt=0×32, info="minutes2-wrap"）→ AES-GCM
-//   ・グループの秘密鍵は jsonbin の「鍵束」に入っていて、鍵束は権限コードから PBKDF2 で作った鍵で暗号化してある
+//   ・グループの秘密鍵は GAS（スクリプトプロパティ）の「鍵束」に入っていて、鍵束は権限コードから PBKDF2 で作った鍵で暗号化してある
 const te = new TextEncoder()
 const td = new TextDecoder()
 const subtle = globalThis.crypto.subtle
@@ -30,7 +30,7 @@ export async function codeKey(code, salt) {
     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
 }
 
-/** jsonbin から GAS 経由で届いた鍵束 {salt, iv, ct} を権限コードで開く */
+/** GAS から届いた鍵束 {salt, iv, ct} を権限コードで開く */
 export async function openBundle(code, sealed) {
   const key = await codeKey(code, unb64(sealed.salt))
   const pt = await subtle.decrypt({ name: 'AES-GCM', iv: unb64(sealed.iv) }, key, unb64(sealed.ct))
